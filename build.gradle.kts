@@ -10,16 +10,20 @@ version = "1.0-SNAPSHOT"
 repositories {
     mavenCentral()
 }
-
+sourceSets {
+    main {
+        resources {
+            srcDirs("src/main/resources")
+        }
+    }
+}
 dependencies {
-    implementation("com.github.zhkl0228:unidbg-api:0.9.7")
-    implementation("com.github.zhkl0228:unidbg-android:0.9.7")
-    implementation("com.github.zhkl0228:unidbg-dynarmic:0.9.7")
-    implementation("com.github.zhkl0228:unidbg-unicorn2:0.9.7")
     implementation("com.squareup.okhttp3:okhttp:5.0.0-alpha.14")
     implementation("org.projectlombok:lombok:1.18.32")
-    implementation ("com.google.code.gson:gson:2.11.0")
+    implementation("com.google.code.gson:gson:2.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0-RC")
+    implementation("org.graalvm.js:js:22.3.0")
+
     testImplementation(kotlin("test"))
 }
 
@@ -27,5 +31,5 @@ tasks.test {
     useJUnitPlatform()
 }
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(8)
 }
