@@ -2,6 +2,7 @@ plugins {
     kotlin("jvm") version "1.9.23"
     kotlin("plugin.lombok") version "2.0.0"
     id("io.freefair.lombok") version "8.6"
+    id("maven-publish")
 }
 
 group = "cn.pprocket"
