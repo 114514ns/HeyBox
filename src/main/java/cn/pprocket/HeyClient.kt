@@ -20,6 +20,7 @@ object HeyClient : Client {
         .build()
     var cookie: String = ""
     val cleanClient = OkHttpClient.Builder().build()
+    var scriptContent = ""
     override fun login(cookie: String) {
         this.cookie = cookie
     }

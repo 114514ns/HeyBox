@@ -1,5 +1,6 @@
 package cn.pprocket.utils
 
+import cn.pprocket.HeyClient
 import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.HostAccess
 import org.graalvm.polyglot.Value
@@ -67,7 +68,7 @@ class SignService {
                 .allowHostClassLookup { s: String? -> true }
                 .allowHostAccess(HostAccess.ALL)
                 .build()
-            val script = String(Files.readAllBytes(Paths.get("extra.js")))
+            val script = HeyClient.scriptContent
             context.eval("js", script);
             func = context.getBindings("js").getMember("hkey")
         }
