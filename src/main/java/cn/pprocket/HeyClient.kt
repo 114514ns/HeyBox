@@ -6,6 +6,8 @@ import cn.pprocket.utils.ParamsBuilder
 import cn.pprocket.utils.SignService
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.google.gson.Strictness
+import com.google.gson.stream.JsonReader
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.*
@@ -21,6 +23,7 @@ object HeyClient : Client {
     var cookie: String = ""
     val cleanClient = OkHttpClient.Builder().build()
     var scriptContent = ""
+
     override fun login(cookie: String) {
         this.cookie = cookie
     }

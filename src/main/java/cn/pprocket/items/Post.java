@@ -37,7 +37,7 @@ public class Post {
         String url = "https://api.xiaoheihe.cn/bbs/app/link/tree?" + builder.build("/bbs/app/link/tree/");
         String str = HeyClient.INSTANCE.get(url);
         JsonObject obj = JsonParser.parseString(str).getAsJsonObject().getAsJsonObject("link");
-        String text = obj.get("text").getAsString();
+        String text = obj.get("text").getAsString().trim();
         JsonArray array = JsonParser.parseString(text).getAsJsonArray();
         String text1 = array.get(0).getAsJsonObject().get("text").getAsString();
         return Jsoup.parse(text1).text();
