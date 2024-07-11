@@ -26,6 +26,7 @@ public class Comment {
     private String replyId;
     private String createdAt;
     private List<String> images;
+    private int likes;
     private String postId;
     private List<Comment> subComments;
 

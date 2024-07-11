@@ -246,6 +246,16 @@ object HeyClient : Client {
             comment.isHasMore = json.get("has_more").asInt == 1
         } catch (_: Exception) {
         }
+        val images = emptyList<String>().toMutableList()
+        if (json.has("imgs")) {
+            json.getAsJsonArray("imgs").forEach {
+                var obj = it.asJsonObject
+                images.add(obj.get("url").asString)
+            }
+        }
+        comment.likes = json.get("up").asInt
+        comment.images = images
+        comment.createdAt = parseTime(json.get("create_at").asString.toLong()*1000)
         return comment
 
     }
