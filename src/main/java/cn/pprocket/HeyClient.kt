@@ -1,20 +1,17 @@
 package cn.pprocket
 
 import cn.pprocket.items.*
-import cn.pprocket.items.User.HardWare
 import cn.pprocket.utils.ParamsBuilder
-import cn.pprocket.utils.SignService
+import cn.pprocket.utils.SignGenerator
+
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import com.google.gson.Strictness
-import com.google.gson.stream.JsonReader
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okio.Buffer
 import okio.BufferedSource
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 object HeyClient : Client {
     private val client = OkHttpClient.Builder()
@@ -30,51 +27,68 @@ object HeyClient : Client {
 
     override fun getUSer(heyId: String): User {
         val user = User()
-        runBlocking {
-            launch {
-                val params = mutableMapOf(
-                    "userid" to heyId,
-                )
-                val str =
-                    get("https://api.xiaoheihe.cn/bbs/app/profile/user/profile?${ParamsBuilder(params).build("/bbs/app/profile/user/profile/")}")
-                var obj = JsonParser.parseString(str).asJsonObject.getAsJsonObject("account_detail")
-                user.userName = obj.get("username").asString
-                user.avatar = obj.get("avatar").asString
-                user.level = obj.getAsJsonObject("level_info").get("level").asInt
-                val bbs = obj.getAsJsonObject("bbs_info")
-                user.posts = bbs.get("post_link_num").asInt
-                user.location = obj.get("ip_location").asString
-                user.followers = bbs.get("follow_num").asInt
-                user.signature = obj.get("signature").asString
-                user.followers = bbs.get("fan_num").asInt
-            }
-            launch {
-                val params = mapOf(
-                    "userid" to heyId
-                )
-                val str =
-                    get("https://api.xiaoheihe.cn/account/heybox_home_v2?${ParamsBuilder(params).build("/account/heybox_home_v2/")}")
-                val obj = JsonParser.parseString(str).asJsonObject
-                user.games = obj.get("game_count").asInt
-                if (obj.has("game_overview")) {
-                    user.hours = obj.getAsJsonArray("game_overview")[1].asJsonObject.get("value").asDouble
-                    user.value = obj.getAsJsonArray("game_overview")[0].asJsonObject.get("value").asDouble
-                }
-                if (obj.has("hardware_info")) {
-                    val hardWare = HardWare()
-                    val o = obj.getAsJsonObject("hardware_info")
-                    hardWare.processor = o.get("cpu").asString
-                    hardWare.graphs = o.get("gpu").asString
-                    hardWare.board = o.get("board").asString
-                }
-                if (obj.has("steam_id_info")) {
-                    user.steamId = obj.getAsJsonObject("steam_id_info").get("steamid").asString
-                    user.steamId = obj.getAsJsonObject("steam_id_info").get("level").asString
-                }
+        val params = mutableMapOf(
+            "userid" to heyId,
+        )
+        val str =
+            get("https://api.xiaoheihe.cn/bbs/app/profile/user/profile?${ParamsBuilder(params).build("/bbs/app/profile/user/profile/")}")
+        var obj = JsonParser.parseString(str).asJsonObject.getAsJsonObject("account_detail")
+        user.userName = obj.get("username").asString
+        user.avatar = obj.get("avatar").asString
+        user.level = obj.getAsJsonObject("level_info").get("level").asInt
+        val bbs = obj.getAsJsonObject("bbs_info")
+        user.posts = bbs.get("post_link_num").asInt
+        user.location = obj.get("ip_location").asString
+        user.followers = bbs.get("follow_num").asInt
+        user.signature = obj.get("signature").asString
+        user.followers = bbs.get("fan_num").asInt
 
+
+        return user
+    }
+
+    fun User.getComments(page: Int): List<Comment> {
+        val params = mapOf(
+            "userid" to this.userId.toString(),
+            "limit" to "20",
+            "offset" to ((page - 1) * 20).toString(),
+        )
+        val url =
+            "https://api.xiaoheihe.cn/bbs/web/profile/post/comments?${ParamsBuilder(params).build("/bbs/web/profile/post/comments/")}"
+        val res = get(url)
+        val comments = mutableListOf<Comment>()
+        JsonParser.parseString(res).asJsonObject.getAsJsonArray("result").forEach {
+            var obj = it.asJsonObject
+            val comment = Comment()
+            comment.commentId = obj.get("comment_id").asString
+            comment.createdAt = parseTime(obj.get("created_at").asLong)
+            comment.content = obj.get("text").asString
+            comment.replyId = try {
+                obj.get("root_comment_id").asString
+            } catch (_: Exception) {
+                null
             }
         }
-        return user
+        return comments
+    }
+
+    fun User.getPosts(page: Int): List<Post> {
+        val params = mapOf(
+            "userid" to this.userId.toString(),
+            "limit" to "20",
+            "offset" to ((page - 1) * 20).toString(),
+            "post_type" to "1",
+        )
+        val url =
+            "https://api.xiaoheihe.cn/bbs/web/profile/post/links?${ParamsBuilder(params).build("/bbs/web/profile/post/links/")}"
+        val res = get(url)
+        val posts = mutableListOf<Post>()
+        JsonParser.parseString(res).asJsonObject.getAsJsonArray("post_links").forEach {
+            val obj = it.asJsonObject
+            val post = parsePost(obj)
+            posts.add(post)
+        }
+        return posts
     }
 
     override fun getPosts(topic: Topic): List<Post> {
@@ -89,26 +103,31 @@ object HeyClient : Client {
         val url = "https://api.xiaoheihe.cn/bbs/app/topic/feeds?${ParamsBuilder(map).build("/bbs/app/topic/feeds/")}"
         val res = get(url)
         JsonParser.parseString(res).asJsonObject.getAsJsonArray("links").forEach {
-            val post = Post()
             var obj = it.asJsonObject
-            post.title = obj.get("title").asString
-            post.postId = obj.get("linkid").asString
-            post.userId = obj.get("userid").asString
-            post.userAvatar = obj.getAsJsonObject("user").get("avatar").asString
-            post.userName = obj.getAsJsonObject("user").get("username").asString
-            post.description = obj.get("description").asString
-            val list = mutableListOf<String>()
-            obj.get("imgs").asJsonArray.forEach {
-                list.add(it.asString)
-            }
-            post.images = list
-            post.createAt = obj.get("create_str").asString
-            post.comments = obj.get("comment_num").asInt
-            post.likes = obj.get("link_award_num").asInt
+            val post = parsePost(obj)
             posts.add(post)
 
         }
         return posts
+    }
+
+    fun parsePost(obj: JsonObject): Post {
+        val post = Post()
+        post.title = obj.get("title").asString
+        post.postId = obj.get("linkid").asString
+        post.userId = obj.get("userid").asString
+        post.userAvatar = obj.getAsJsonObject("user").get("avatar").asString
+        post.userName = obj.getAsJsonObject("user").get("username").asString
+        post.description = obj.get("description").asString
+        val list = mutableListOf<String>()
+        obj.get("imgs").asJsonArray.forEach {
+            list.add(it.asString)
+        }
+        post.images = list
+        post.createAt = obj.get("create_str").asString
+        post.comments = obj.get("comment_num").asInt
+        post.likes = obj.get("link_award_num").asInt
+        return post
     }
 
     override fun getPost(id: String): Post {
@@ -117,12 +136,12 @@ object HeyClient : Client {
 
     override fun getGame(id: String): Game {
         var time = (System.currentTimeMillis() / 1000).toString()
-        val nonce = SignService.md5(Random().nextDouble().toString()).uppercase()
+        val nonce = SignGenerator.md5(Random().nextDouble().toString()).uppercase()
         var string = directGet(
             "https://api.xiaoheihe.cn/game/get_game_detail/?os_type=web&app=heybox&client_type=mobile&version=999.0.3&x_client_type=web&x_os_type=Windows&x_client_version=&x_app=heybox&heybox_id=-1&steam_appid=${id}&hkey=${
-                SignService.calc(
+                SignGenerator().hkey(
                     "/game/get_game_detail/",
-                    time,
+                    time.toInt(),
                     nonce
                 )
             }&_time=${time}&nonce=${nonce}"
@@ -217,13 +236,16 @@ object HeyClient : Client {
         comment.commentId = json.get("commentid").asString
         try {
             comment.replyId = json.getAsJsonObject("replyuser").get("userid").asString
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         try {
             comment.replyName = json.getAsJsonObject("replyuser").get("username").asString
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         try {
             comment.isHasMore = json.get("has_more").asInt == 1
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         return comment
 
     }
@@ -247,6 +269,43 @@ object HeyClient : Client {
 
 }
 
+fun parseTime(timeInMillis: Long): String {
+    val currentTime = System.currentTimeMillis()
+    val diff = currentTime - timeInMillis
+
+    return when {
+        diff < TimeUnit.MINUTES.toMillis(1) -> {
+            val seconds = TimeUnit.MILLISECONDS.toSeconds(diff)
+            "$seconds 秒前"
+        }
+
+        diff < TimeUnit.HOURS.toMillis(1) -> {
+            val minutes = TimeUnit.MILLISECONDS.toMinutes(diff)
+            "$minutes 分钟前"
+        }
+
+        diff < TimeUnit.DAYS.toMillis(1) -> {
+            val hours = TimeUnit.MILLISECONDS.toHours(diff)
+            "$hours 小时前"
+        }
+
+        diff < TimeUnit.DAYS.toMillis(30) -> {
+            val days = TimeUnit.MILLISECONDS.toDays(diff)
+            "$days 天前"
+        }
+
+        diff < TimeUnit.DAYS.toMillis(365) -> {
+            val months = TimeUnit.MILLISECONDS.toDays(diff) / 30
+            "$months 个月前"
+        }
+
+        else -> {
+            val years = TimeUnit.MILLISECONDS.toDays(diff) / 365
+            "$years 年前"
+        }
+    }
+}
+
 class HeyInterceptor : Interceptor {
 
 
@@ -265,8 +324,13 @@ class HeyInterceptor : Interceptor {
 
         // 将原始响应内容转换为字符串
         val originalResponseString = buffer.clone().readString(Charsets.UTF_8)
-        val modifiedResponseString =
-            JsonParser.parseString(originalResponseString).asJsonObject.getAsJsonObject("result").toString()
+        var jsonObject = JsonParser.parseString(originalResponseString).asJsonObject
+        var modifiedResponseString = jsonObject.toString()
+        if (jsonObject.has("result") && jsonObject.get("result").isJsonObject) {
+            modifiedResponseString =
+                jsonObject.getAsJsonObject("result").toString()
+        }
+
         // 创建新的响应体
         val modifiedResponseBody = ResponseBody.create("application/json".toMediaTypeOrNull(), modifiedResponseString)
 

@@ -2,10 +2,7 @@ package org.example
 
 import cn.pprocket.HeyClient
 import cn.pprocket.items.Topic
-import cn.pprocket.utils.SignService
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.Paths
 
 
 fun main() {

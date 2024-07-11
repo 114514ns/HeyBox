@@ -24,6 +24,9 @@ public class Comment {
     private boolean hasMore;
     private String replyName;
     private String replyId;
+    private String createdAt;
+    private List<String> images;
+    private String postId;
     private List<Comment> subComments;
 
     public List<Comment> fillSubComments() {

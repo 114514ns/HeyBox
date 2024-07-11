@@ -1,5 +1,8 @@
 import org.gradle.api.publish.maven.MavenPublication
+import org.gradle.internal.impldep.org.eclipse.jgit.lib.ObjectChecker.encoding
 import org.gradle.jvm.tasks.Jar
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
     kotlin("jvm") version "1.9.23"
     kotlin("plugin.lombok") version "2.0.0"
@@ -8,13 +11,14 @@ plugins {
 }
 
 group = "cn.pprocket"
-version = "240709-114514"
+version = "240710-1"
 
 repositories {
     mavenCentral()
     maven {
         url = uri("https://jitpack.io")
     }
+    maven ( "https://s01.oss.sonatype.org/content/repositories/snapshots/")
 
 }
 sourceSets {
@@ -67,4 +71,5 @@ publishing {
         }
     }
 }
+
 

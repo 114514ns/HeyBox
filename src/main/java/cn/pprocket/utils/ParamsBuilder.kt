@@ -38,39 +38,12 @@ class ParamsBuilder(private val maps: Map<String, String>) {
             "heybox_id" to "-1",
             "nonce" to hash,
             "_time" to time,
-            "hkey" to SignService.calc(path,time,hash),
+            "hkey" to SignGenerator().hkey(path,time.toInt(),hash),
             "_chat_time" to (time.toInt() * 10000 + 413)
             )
         var tmp = maps.map { (key, value) -> "${key}=${value}" }
             .joinToString("&")
         return "$tmp&" + builtin.map { (key, value) -> "${key}=${value}" }
             .joinToString("&")
-    }
-}
-class SignService {
-    companion object {
-        var func : Value? = null
-        fun calc(path: String, time: String, nonce: String): String {
-            val args: MutableList<Any> = ArrayList(10)
-            args.add(path)
-            args.add(time)
-            args.add(nonce)
-            return func!!.execute(path,time, nonce).asString()
-        }
-        @OptIn(ExperimentalStdlibApi::class)
-        fun md5(data: String): String {
-            val md = MessageDigest.getInstance("MD5")
-            md.update(data.toByteArray())
-            return md.digest().toHexString()
-        }
-        init {
-            val context = Context.newBuilder("js")
-                .allowHostClassLookup { s: String? -> true }
-                .allowHostAccess(HostAccess.ALL)
-                .build()
-            val script = HeyClient.scriptContent
-            context.eval("js", script);
-            func = context.getBindings("js").getMember("hkey")
-        }
     }
 }
