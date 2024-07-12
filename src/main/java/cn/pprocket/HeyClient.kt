@@ -92,7 +92,7 @@ object HeyClient : Client {
         return posts
     }
 
-    override fun getPosts(topic: Topic): List<Post> {
+    override fun getPosts(topic: Topic ): List<Post> {
         val id = topic.id
         val posts = mutableListOf<Post>()
         var res = ""
@@ -249,6 +249,24 @@ object HeyClient : Client {
             comments.add(comment)
         }
         return comments
+    }
+
+    override fun reply(postId: String, text: String, rootId: String?) {
+        var builder = FormBody.Builder()
+        builder.add("link_id", postId)
+        builder.add("text", text)
+        if (rootId!= null) {
+            builder.add("root_id", rootId)
+            builder.add("reply_id", rootId)
+        }
+        val params = mapOf<String,String>()
+        val url =
+                "https://api.xiaoheihe.cn/bbs/app/comment/create?${ParamsBuilder(params).build("/bbs/app/comment/create/")}"
+        val request = Request.Builder()
+            .url(url)
+            .post(builder.build())
+            .build()
+        client.newCall(request).execute()
     }
 
     fun parseComment(json: JsonObject): Comment {

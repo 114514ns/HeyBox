@@ -34,6 +34,8 @@ public class Post {
             String url = "https://api.xiaoheihe.cn/bbs/app/link/web/view?" + new ParamsBuilder(params).build("/bbs/app/link/web/view/");
             String string = HeyClient.INSTANCE.get(url);
             JsonObject obj = JsonParser.parseString(string).getAsJsonObject().getAsJsonObject("link");
+            userName = obj.getAsJsonObject("poster").get("username").getAsString();
+            userAvatar = obj.getAsJsonObject("poster").get("avatar").getAsString();
             JsonArray content1 = obj.getAsJsonArray("content");
             String text2 = content1.get(0).getAsJsonObject().get("text").getAsString();
             for (int i = 1; i < content1.size(); i++) {
