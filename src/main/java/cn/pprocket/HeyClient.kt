@@ -10,6 +10,7 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okio.Buffer
 import okio.BufferedSource
+import org.jsoup.Jsoup
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -94,19 +95,37 @@ object HeyClient : Client {
     override fun getPosts(topic: Topic): List<Post> {
         val id = topic.id
         val posts = mutableListOf<Post>()
-        val map = mapOf(
-            "topic_id" to id.toString(),
-            "offset" to "20",
-            "limit" to "20",
-            "sort_filter" to "hot-rank"
-        )
-        val url = "https://api.xiaoheihe.cn/bbs/app/topic/feeds?${ParamsBuilder(map).build("/bbs/app/topic/feeds/")}"
-        val res = get(url)
+        var res = ""
+        if (topic.id != -1) {
+            val map = mapOf(
+                "topic_id" to id.toString(),
+                "offset" to "20",
+                "limit" to "20",
+                "sort_filter" to "hot-rank"
+            )
+            val url =
+                "https://api.xiaoheihe.cn/bbs/app/topic/feeds?${ParamsBuilder(map).build("/bbs/app/topic/feeds/")}"
+            res = get(url)
+        } else {
+            val params = mapOf(
+                "offset" to "0",
+                "limit" to "30",
+                "tag" to "-1",
+                "rec_mark" to "timeline",
+                "news_list_type" to "normal",
+                "is_first" to "0",
+                "news_list_group" to "control-group",
+            )
+            val url =
+                "https://api.xiaoheihe.cn/bbs/app/feeds/news?${ParamsBuilder(params).build("/bbs/app/feeds/news/")}"
+            res = get(url)
+        }
         JsonParser.parseString(res).asJsonObject.getAsJsonArray("links").forEach {
-            var obj = it.asJsonObject
-            val post = parsePost(obj)
-            posts.add(post)
-
+            if (!it.toString().substring(0,25).contains("banner")) {
+                var obj = it.asJsonObject
+                val post = parsePost(obj)
+                posts.add(post)
+            }
         }
         return posts
     }
@@ -116,15 +135,21 @@ object HeyClient : Client {
         post.title = obj.get("title").asString
         post.postId = obj.get("linkid").asString
         post.userId = obj.get("userid").asString
-        post.userAvatar = obj.getAsJsonObject("user").get("avatar").asString
-        post.userName = obj.getAsJsonObject("user").get("username").asString
+
+        if (obj.has("user")) {
+            post.userAvatar = obj.getAsJsonObject("user").get("avatar").asString
+            post.userName = obj.getAsJsonObject("user").get("username").asString
+        } else {
+            post.userAvatar = "https://avatars.akamai.steamstatic.com/6a477d65670b03bae1c5f48988211ff0366c6a8c_full.jpg"
+            post.userName = "狗熊岭军师熊二"
+        }
         post.description = obj.get("description").asString
         val list = mutableListOf<String>()
         obj.get("imgs").asJsonArray.forEach {
             list.add(it.asString)
         }
         post.images = list
-        post.createAt = obj.get("create_str").asString
+        post.createAt = try { obj.get("create_str").asString} catch (e: Exception) { obj.get("formated_time").asString }
         post.comments = obj.get("comment_num").asInt
         post.likes = obj.get("link_award_num").asInt
         return post
@@ -226,13 +251,13 @@ object HeyClient : Client {
         return comments
     }
 
-    public fun parseComment(json: JsonObject): Comment {
+    fun parseComment(json: JsonObject): Comment {
 
         val comment = Comment()
         comment.userId = json.getAsJsonObject("user").get("userid").asString
         comment.userName = json.getAsJsonObject("user").get("username").asString
         comment.userAvatar = json.getAsJsonObject("user").get("avatar").asString
-        comment.content = json.get("text").asString
+        comment.content = Jsoup.parse(json.get("text").asString).text()
         comment.commentId = json.get("commentid").asString
         try {
             comment.replyId = json.getAsJsonObject("replyuser").get("userid").asString
@@ -255,7 +280,7 @@ object HeyClient : Client {
         }
         comment.likes = json.get("up").asInt
         comment.images = images
-        comment.createdAt = parseTime(json.get("create_at").asString.toLong()*1000)
+        comment.createdAt = parseTime(json.get("create_at").asString.toLong() * 1000)
         return comment
 
     }
@@ -276,6 +301,7 @@ object HeyClient : Client {
             .build()
         return cleanClient.newCall(request).execute().body.string()
     }
+
 
 }
 
@@ -349,6 +375,4 @@ class HeyInterceptor : Interceptor {
             .body(modifiedResponseBody)
             .build()
     }
-
-
 }

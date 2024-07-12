@@ -13,6 +13,7 @@ public class Topic {
     public static Topic SCHOOL = new Topic("校园生活", 549999);
     public static Topic HARDWARE = new Topic("数码硬件", 18745);
     public static Topic WORK = new Topic("职场工作", 550000);
+    public static Topic HOTS = new Topic("热点", -1);
 
 }
 

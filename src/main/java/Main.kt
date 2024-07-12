@@ -11,7 +11,8 @@ fun main() {
     HeyClient.scriptContent = File("extra.js").readText()
     HeyClient.login("pkey=MTcwODY3NTg1MS41NF8zNjMzMTI0MmRjcnRwZXNiZGxwemhic3o__;x_xhh_tokenid=BAJCrLrAMOH4/SkA76ynCBKbajL/uOjmpDAXO982aiQrcn3oqS+MAAEFGrV4Jvfv+Bib1MYejU0cioWEIVVjXJw==")
     //var comments = HeyClient.getComments("127643195", 1)
-    HeyClient.getComments("126700671",1)
+    //HeyClient.getComments("126700671",1)
+    HeyClient.getPosts(Topic.HOTS)
 
 
 }
