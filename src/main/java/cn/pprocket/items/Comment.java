@@ -29,6 +29,7 @@ public class Comment {
     private int likes;
     private String postId;
     private List<Comment> subComments;
+    private Post extraPost;
 
     public List<Comment> fillSubComments() {
         if (!hasMore) return subComments;
@@ -44,6 +45,7 @@ public class Comment {
         });
         hasMore = JsonParser.parseString(string).getAsJsonObject().get("has_more").getAsBoolean();
         removeDuplicate(this.subComments);
+        this.subComments.forEach(ele -> ele.postId = postId);
         return this.subComments;
 
     }

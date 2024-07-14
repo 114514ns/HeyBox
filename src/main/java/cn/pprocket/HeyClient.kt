@@ -11,12 +11,15 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okio.Buffer
 import okio.BufferedSource
 import org.jsoup.Jsoup
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.util.*
 import java.util.concurrent.TimeUnit
 
 object HeyClient : Client {
     private val client = OkHttpClient.Builder()
         .addInterceptor(HeyInterceptor())
+        //.proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress("192.168.31.178", 9000)))
         .build()
     var cookie: String = ""
     val cleanClient = OkHttpClient.Builder().build()
@@ -26,7 +29,7 @@ object HeyClient : Client {
         this.cookie = cookie
     }
 
-    override fun getUSer(heyId: String): User {
+    override fun getUser(heyId: String): User {
         val user = User()
         val params = mutableMapOf(
             "userid" to heyId,
@@ -43,12 +46,12 @@ object HeyClient : Client {
         user.followers = bbs.get("follow_num").asInt
         user.signature = obj.get("signature").asString
         user.followers = bbs.get("fan_num").asInt
-
+        user.userId = obj.get("userid").asString
 
         return user
     }
 
-    fun User.getComments(page: Int): List<Comment> {
+    fun User.fetchComments(page: Int): List<Comment> {
         val params = mapOf(
             "userid" to this.userId.toString(),
             "limit" to "20",
@@ -62,18 +65,30 @@ object HeyClient : Client {
             var obj = it.asJsonObject
             val comment = Comment()
             comment.commentId = obj.get("comment_id").asString
-            comment.createdAt = parseTime(obj.get("created_at").asLong)
+            comment.createdAt = parseTime(obj.get("create_at").asString.replace(".0","").toLong()*1000)
             comment.content = obj.get("text").asString
             comment.replyId = try {
                 obj.get("root_comment_id").asString
             } catch (_: Exception) {
                 null
             }
+            var link = obj.get("link").asJsonObject
+            val post = Post()
+            post.postId = link.get("id").asString
+            post.title = link.get("title").asString
+            post.images = mutableListOf<String>()
+            link.getAsJsonArray("thumbs").forEach {
+                post.images.add(it.asString)
+            }
+            comment.userAvatar = this.avatar
+            comment.userName = this.userName
+            comment.extraPost = post
+            comments.add(comment)
         }
         return comments
     }
 
-    fun User.getPosts(page: Int): List<Post> {
+    fun User.fetchPosts(page: Int): List<Post> {
         val params = mapOf(
             "userid" to this.userId.toString(),
             "limit" to "20",
@@ -143,7 +158,7 @@ object HeyClient : Client {
             post.userAvatar = "https://avatars.akamai.steamstatic.com/6a477d65670b03bae1c5f48988211ff0366c6a8c_full.jpg"
             post.userName = "狗熊岭军师熊二"
         }
-        post.description = obj.get("description").asString
+        post.description = Jsoup.parse(obj.get("description").asString).text()
         val list = mutableListOf<String>()
         obj.get("imgs").asJsonArray.forEach {
             list.add(it.asString)
@@ -248,6 +263,12 @@ object HeyClient : Client {
             comment.subComments = sub
             comments.add(comment)
         }
+        comments.forEach {
+            it.subComments.forEach {
+                it.postId = postId
+            }
+            it.postId = postId
+        }
         return comments
     }
 
@@ -261,12 +282,21 @@ object HeyClient : Client {
         }
         val params = mapOf<String,String>()
         val url =
-                "https://api.xiaoheihe.cn/bbs/app/comment/create?${ParamsBuilder(params).build("/bbs/app/comment/create/")}"
+                "http://api.xiaoheihe.cn/bbs/app/comment/create?${ParamsBuilder(params).build("/bbs/app/comment/create/")}"
         val request = Request.Builder()
             .url(url)
             .post(builder.build())
             .build()
-        client.newCall(request).execute()
+        var string = client.newCall(request).execute().body.string()
+        println(string)
+    }
+
+    override fun genQRCode(): String {
+        val params = mapOf<String, String>()
+        val url =
+                "https://api.xiaoheihe.cn/account/get_qrcode_url?${ParamsBuilder(params).build("/account/get_qrcode_url/")}"
+        val str = get(url)
+        return JsonParser.parseString(str).asJsonObject.get("qr_url").asString
     }
 
     fun parseComment(json: JsonObject): Comment {
@@ -302,6 +332,9 @@ object HeyClient : Client {
         return comment
 
     }
+    override fun checkLogin():Boolean {
+        return true
+    }
 
     fun get(url: String): String {
         var string = client.newCall(
@@ -319,7 +352,18 @@ object HeyClient : Client {
             .build()
         return cleanClient.newCall(request).execute().body.string()
     }
+    fun test() {
+        val params = mapOf(
+            "pull" to "1",
+            "use_history" to "0",
+            "last_pull" to "1",
+            "is_first" to "0",
 
+            )
+        val url = "https://api.xiaoheihe.cn/bbs/app/feeds?${ParamsBuilder(params).build("/bbs/app/feeds/")}"
+        val str = get(url)
+        println(str)
+    }
 
 
 }
@@ -361,6 +405,7 @@ fun parseTime(timeInMillis: Long): String {
     }
 }
 
+
 class HeyInterceptor : Interceptor {
 
 
@@ -368,7 +413,7 @@ class HeyInterceptor : Interceptor {
         var url = chain.request().url.toUrl().toString()
         var newBuilder = chain.request().newBuilder()
         newBuilder.addHeader("Cookie", HeyClient.cookie)
-        val response = chain.proceed(chain.request())
+        val response = chain.proceed(newBuilder.build())
         // 获取原始响应内容
         val originalBody = response.body ?: return response
 

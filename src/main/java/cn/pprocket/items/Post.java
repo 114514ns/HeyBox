@@ -38,9 +38,14 @@ public class Post {
             userAvatar = obj.getAsJsonObject("poster").get("avatar").getAsString();
             JsonArray content1 = obj.getAsJsonArray("content");
             String text2 = content1.get(0).getAsJsonObject().get("text").getAsString();
-            for (int i = 1; i < content1.size(); i++) {
-                JsonObject o = content1.get(i).getAsJsonObject();
-                images.add(o.get("url").getAsString());
+            try {
+                for (int i = 1; i < content1.size(); i++) {
+                    JsonObject o = content1.get(i).getAsJsonObject();
+                    images.add(o.get("url").getAsString());
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                return "";
             }
             content = Jsoup.parse(text2).text();
             return Jsoup.parse(text2).text();
@@ -56,9 +61,19 @@ public class Post {
             String url = "https://api.xiaoheihe.cn/bbs/app/link/tree?" + builder.build("/bbs/app/link/tree/");
             String str = HeyClient.INSTANCE.get(url);
             JsonObject obj = JsonParser.parseString(str).getAsJsonObject().getAsJsonObject("link");
-            String text = obj.get("text").getAsString().trim();
+            String text = "";
+            /*
+            if(obj.has("text")) {
+                text = obj.get("text").getAsString().trim();
+            }
+            if(!JsonParser.parseString(text).isJsonArray()) {
+                System.out.println("Error");
+            }
             JsonArray array = JsonParser.parseString(text).getAsJsonArray();
             String text1 = array.get(0).getAsJsonObject().get("text").getAsString();
+
+             */
+            String text1 = obj.get("description").getAsString();
             return Jsoup.parse(text1).text();
         }
 
