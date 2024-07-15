@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "cn.pprocket"
-version = "240714-5"
+version = "240715-1"
 
 repositories {
     mavenCentral()
@@ -30,7 +30,8 @@ sourceSets {
 }
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.0.0-alpha.14")
-    implementation("org.projectlombok:lombok:1.18.32")
+    compileOnly("org.projectlombok:lombok:1.18.32")
+    annotationProcessor("org.projectlombok:lombok:1.18.32")
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0-RC")
     implementation("org.graalvm.js:js:22.3.0")
