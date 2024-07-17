@@ -1,15 +1,7 @@
 package cn.pprocket.utils
 
-import cn.pprocket.HeyClient
-import org.graalvm.polyglot.Context
-import org.graalvm.polyglot.HostAccess
-import org.graalvm.polyglot.Value
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.security.MessageDigest
 import java.util.*
-import javax.script.Invocable
-import kotlin.text.HexFormat
 
 
 class ParamsBuilder(private val maps: Map<String, String>) {
@@ -40,7 +32,8 @@ class ParamsBuilder(private val maps: Map<String, String>) {
             "_time" to time,
             "hkey" to SignGenerator().hkey(path,time.toInt(),hash),
             "_chat_time" to (time.toInt() * 10000 + 413),
-            "imei" to "58dcf9f48bba35a0"
+            "imei" to "58dcf9f48bba35a0",
+            "build" to "783"
             )
         var tmp = maps.map { (key, value) -> "${key}=${value}" }
             .joinToString("&")

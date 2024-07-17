@@ -11,7 +11,8 @@ fun main() {
     HeyClient.login(File("cookie.txt").readText().replace("[\r\n]".toRegex(), ""))
     //var comments = HeyClient.getComments("127643195", 1)
     //HeyClient.getComments("126700671",1)
-    println(HeyClient.genQRCode())
+
+    HeyClient.getPosts(Topic.RECOMMEND)
 
 
 }

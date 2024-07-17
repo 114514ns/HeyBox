@@ -3,6 +3,7 @@ package cn.pprocket.items;
 import cn.pprocket.HeyClient;
 import cn.pprocket.utils.ParamsBuilder;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lombok.Data;
@@ -27,55 +28,27 @@ public class Post {
     private String content = "";
 
     public String fillContent() {
-        if (userName.contains("熊二")) {
-            Map<String, String> params = new HashMap<>();
-            params.put("return_json", "1");
-            params.put("link_id", postId);
-            String url = "https://api.xiaoheihe.cn/bbs/app/link/web/view?" + new ParamsBuilder(params).build("/bbs/app/link/web/view/");
-            String string = HeyClient.INSTANCE.get(url);
-            JsonObject obj = JsonParser.parseString(string).getAsJsonObject().getAsJsonObject("link");
-            userName = obj.getAsJsonObject("poster").get("username").getAsString();
-            userAvatar = obj.getAsJsonObject("poster").get("avatar").getAsString();
-            JsonArray content1 = obj.getAsJsonArray("content");
-            String text2 = content1.get(0).getAsJsonObject().get("text").getAsString();
-            try {
-                for (int i = 1; i < content1.size(); i++) {
-                    JsonObject o = content1.get(i).getAsJsonObject();
-                    images.add(o.get("url").getAsString());
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                return "";
-            }
-            content = Jsoup.parse(text2).text();
-            return Jsoup.parse(text2).text();
-        } else {
-            String postId = this.postId;
-            int page = 1;
-            Map<String, String> map = new HashMap<String, String>();
-            map.put("link_id", postId);
-            map.put("page", Integer.toString(page));
-            map.put("limit", "10");
-            map.put("sort_filter", "hot");
-            ParamsBuilder builder = new ParamsBuilder(map);
-            String url = "https://api.xiaoheihe.cn/bbs/app/link/tree?" + builder.build("/bbs/app/link/tree/");
-            String str = HeyClient.INSTANCE.get(url);
-            JsonObject obj = JsonParser.parseString(str).getAsJsonObject().getAsJsonObject("link");
-            String text = "";
-            /*
-            if(obj.has("text")) {
-                text = obj.get("text").getAsString().trim();
-            }
-            if(!JsonParser.parseString(text).isJsonArray()) {
-                System.out.println("Error");
-            }
-            JsonArray array = JsonParser.parseString(text).getAsJsonArray();
-            String text1 = array.get(0).getAsJsonObject().get("text").getAsString();
-
-             */
-            String text1 = obj.get("description").getAsString();
-            return Jsoup.parse(text1).text();
+        Map<String, String> map = new HashMap<String, String>();
+        StringBuilder sb = new StringBuilder();
+        map.put("link_id", postId);
+        map.put("return_json", "1");
+        map.put("index", "1");
+        String url =
+                "https://api.xiaoheihe.cn/bbs/app/link/web/view?" + new ParamsBuilder(map).build("/bbs/app/link/web/view/");
+        String string = HeyClient.INSTANCE.get(url);
+        JsonObject parsed = JsonParser.parseString(string).getAsJsonObject().getAsJsonObject("link");
+        String str = parsed.getAsJsonArray("content").get(0).getAsJsonObject().get("text").getAsString();
+        if (!userName.contains("熊二")) {
+            return Jsoup.parse(str).text();
         }
+        Jsoup.parse(str).getElementsByTag("body").get(0).children().forEach(ele -> {
+            sb.append(ele.text()).append(System.lineSeparator());
+        });
+        if (this.userName.contains("熊二")) {
+            this.userName = parsed.getAsJsonObject("poster").get("username").getAsString();
+            this.userAvatar = parsed.getAsJsonObject("poster").get("avatar").getAsString();
+        }
+        return sb.toString();
 
     }
 }

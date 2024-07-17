@@ -15,6 +15,6 @@ interface Client {
     fun getComments(postId: String, page: Int): List<Comment>
     fun reply(postId: String, text: String, rootId: String? = null)
     fun genQRCode(): String
-    fun checkLogin(): Boolean
+    fun checkLogin(url:String): Boolean
 
 }

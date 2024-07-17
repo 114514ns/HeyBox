@@ -11,14 +11,14 @@ plugins {
 }
 
 group = "cn.pprocket"
-version = "240715-1"
+version = "240716-7"
 
 repositories {
     mavenCentral()
     maven {
         url = uri("https://jitpack.io")
     }
-    maven ( "https://s01.oss.sonatype.org/content/repositories/snapshots/")
+    maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
 
 }
 sourceSets {
@@ -29,14 +29,13 @@ sourceSets {
     }
 }
 dependencies {
-    implementation("com.squareup.okhttp3:okhttp:5.0.0-alpha.14")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.code.gson:gson:2.11.0")
+    implementation("org.jsoup:jsoup:1.15.3")
+    implementation("com.github.zhkl0228:unidbg-parent:0.9.7")
+    implementation("com.github.zhkl0228:unidbg-android:0.9.7")
     compileOnly("org.projectlombok:lombok:1.18.32")
     annotationProcessor("org.projectlombok:lombok:1.18.32")
-    implementation("com.google.code.gson:gson:2.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0-RC")
-    implementation("org.graalvm.js:js:22.3.0")
-    implementation("org.jsoup:jsoup:1.15.3")
-
     testImplementation(kotlin("test"))
 }
 
