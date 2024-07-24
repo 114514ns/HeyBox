@@ -9,10 +9,12 @@ import com.google.gson.JsonParser
 import com.google.gson.Strictness
 import com.google.gson.stream.JsonReader
 import okhttp3.*
+import okhttp3.MediaType.Companion.parse
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okio.Buffer
 import okio.BufferedSource
 import org.example.cn.pprocket.utils.app.AppParamsBuilder
+import org.example.cn.pprocket.utils.app.AppSignGenerator
 import org.jsoup.Jsoup
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -151,9 +153,11 @@ object HeyClient : Client {
         }
         JsonParser.parseString(res).asJsonObject.getAsJsonArray("links").forEach {
             if (!it.toString().substring(0, 25).contains("banner")) {
-                var obj = it.asJsonObject
+                val obj = it.asJsonObject
                 val post = parsePost(obj)
-                posts.add(post)
+                if (post.title != null) {
+                    posts.add(post)
+                }
             }
         }
         return posts
@@ -161,6 +165,11 @@ object HeyClient : Client {
 
     fun parsePost(obj: JsonObject): Post {
         val post = Post()
+        if (!obj.has("linkid")) {
+            return post
+        }
+
+
         post.title = obj.get("title").asString
         post.postId = obj.get("linkid").asString
         post.userId = obj.get("userid").asString
@@ -175,25 +184,80 @@ object HeyClient : Client {
         post.description = Jsoup.parse(obj.get("description").asString).text()
         val list = mutableListOf<String>()
         obj.get("imgs").asJsonArray.forEach {
-            list.add(it.asString)
+            list.add(it.asString.replace("webp", "jpg"))
         }
         post.images = list
-        if(obj.has("create_str")) {
+        if (obj.has("create_str")) {
             post.createAt = obj.get("create_str").asString
         }
-        if(obj.has("formated_time")) {
+        if (obj.has("formated_time")) {
             post.createAt = obj.get("formated_time").asString
         }
-        if(obj.has("create_at")) {
-            post.createAt = parseTime(obj.get("create_at").asString.toLong())
+        if (obj.has("create_at")) {
+            post.createAt = parseTime(obj.get("create_at").asString.toLong() * 1000)
         }
+        post.tags = mutableListOf()
+
+        if (obj.has("bottom_rich_text")) {
+            obj["bottom_rich_text"].asJsonObject["models"].asJsonArray.forEach {
+                val v0 = it.asJsonObject["attrs"].asJsonArray[0].asJsonObject
+                if (v0["type"].asString == "text") {
+                    if (v0["text"].asString != ".") {
+                        post.tags.add(v0["text"].asString)
+                    }
+                }
+
+            }
+        }
+
+        post.tags = post.tags.distinctBy { it }
         post.comments = obj.get("comment_num").asInt
         post.likes = obj.get("link_award_num").asInt
         return post
     }
 
     override fun getPost(id: String): Post {
-        TODO("Not yet implemented")
+        val params = mapOf(
+            "link_id" to id
+        )
+        val url =
+            "https://api.xiaoheihe.cn/bbs/app/api/share/data/?${ParamsBuilder(params).build("/bbs/app/api/share/data/")}"
+        val res = get(url)
+        val post = parseWebPost(JsonParser.parseString(res).asJsonObject.getAsJsonObject("link"))
+        return post
+    }
+
+    fun parseWebPost(obj: JsonObject): Post {
+        val post = Post()
+        post.title = obj.get("title").asString
+        post.postId = obj.get("linkid").asString
+        post.tags = mutableListOf()
+        obj.get("hashtags").asJsonArray.forEach {
+            post.tags.add(it.asString)
+        }
+        val builder = StringBuilder()
+        val images = mutableListOf<String>()
+        obj.getAsJsonArray("content").forEach {
+            var jsonObject = it.asJsonObject
+            if (jsonObject.has("text")) {
+                builder.append(jsonObject.get("text").asString, "\n")
+            }
+            if (jsonObject.has("url")) {
+                images.add(jsonObject.get("url").asString)
+            }
+        }
+        post.images = images
+        post.content = builder.toString()
+        post.userName = obj.getAsJsonObject("poster").get("username").asString
+        post.userAvatar = obj.getAsJsonObject("poster").get("avatar").asString
+        post.userId = obj.getAsJsonObject("poster").get("userid").asString
+        post.createAt = parseTime(obj.get("create_at").asFloat.toLong()*1000)
+        post.tags = mutableListOf()
+        obj.getAsJsonArray("content_tags").forEach {
+            post.tags.add(it.asJsonObject.get("text").asString)
+        }
+        return post
+
     }
 
     override fun getGame(id: String): Game {
@@ -256,6 +320,23 @@ object HeyClient : Client {
         game.screenshots = screenshots
         return game
     }
+    /*
+
+    init {
+        Thread {
+            for (i in 0..3) {
+                AppSignGenerator.hkey(
+                    "/bbs/app",
+                    System.currentTimeMillis().toString(),
+                    "skiko.directx.gpu.prioritydiscrete"
+                )
+            }
+
+        }.start()
+    }
+
+     */
+
 
     override fun getComments(postId: String, page: Int): List<Comment> {
         val comments = mutableListOf<Comment>()
@@ -301,10 +382,14 @@ object HeyClient : Client {
         if (rootId != null) {
             builder.add("root_id", rootId)
             builder.add("reply_id", rootId)
+        } else {
+            builder.add("root_id", "-1")
+            builder.add("reply_id", "-1")
         }
+        builder.add("is_cy", "0")
         val params = mapOf<String, String>()
         val url =
-            "http://api.xiaoheihe.cn/bbs/app/comment/create?${ParamsBuilder(params).build("/bbs/app/comment/create/")}"
+            "https://api.xiaoheihe.cn/bbs/app/comment/create?${ParamsBuilder(params).build("/bbs/app/comment/create/")}"
         val request = Request.Builder()
             .url(url)
             .post(builder.build())
@@ -462,8 +547,8 @@ class HeyInterceptor : Interceptor {
         if (jsonObject.has("result") && jsonObject.get("result").isJsonObject) {
             modifiedResponseString =
                 jsonObject.getAsJsonObject("result").toString()
-            if (jsonObject.has("error_msg")) {
-                if (jsonObject.get("error_msg").asString == "登录成功") {
+            if (jsonObject.getAsJsonObject("result").has("error_msg")) {
+                if (jsonObject.getAsJsonObject("result").get("error_msg").asString.contains("登录成功")) {
                     val cookies = mutableListOf<String>()
                     response.headers.values("Set-Cookie").forEach {
                         it.split(";").forEach {

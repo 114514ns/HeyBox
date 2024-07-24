@@ -1,20 +1,42 @@
 package org.example.cn.pprocket.utils.app
 
 import com.github.unidbg.AndroidEmulator
+import com.github.unidbg.Emulator
+import com.github.unidbg.Module
 import com.github.unidbg.Symbol
+import com.github.unidbg.arm.HookStatus
+import com.github.unidbg.hook.HookContext
+import com.github.unidbg.hook.ReplaceCallback
+import com.github.unidbg.hook.hookzz.Dobby
 import com.github.unidbg.linux.android.AndroidEmulatorBuilder
 import com.github.unidbg.linux.android.AndroidResolver
 import com.github.unidbg.linux.android.dvm.*
 import com.github.unidbg.linux.android.dvm.api.Signature
 import com.github.unidbg.linux.android.dvm.array.ArrayObject
+import com.github.unidbg.pointer.UnidbgPointer
 import java.io.File
+
 
 object AppSignGenerator :AbstractJni() {
     private var symbol: Symbol? = null
     private var emulator: AndroidEmulator? = null
     private var vm: VM? = null
     private var flag = false
+    private var module: Module? = null
+    fun ByteArray.toHexString(): String {
+        return joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
+    }
     fun hkey(path: String, time: String, nonce: String): String {
+
+
+        /*
+        var arg1 = emulator!!.memory.allocateStack(256)
+        var arg2 = emulator!!.memory.allocateStack(256)
+        arg2.write("200683".encodeToByteArray())
+        emulator!!.eFunc(module!!.base + 0x2df4,arg1.peer,arg2.peer,6)
+
+         */
+
         val args: MutableList<Any> = ArrayList(10)
         args.add(vm!!.jniEnv)
         args.add(0)
@@ -44,9 +66,26 @@ object AppSignGenerator :AbstractJni() {
         vm!!.setVerbose(false)
         vm!!.setJni(this)
         val dm = vm!!.loadLibrary(File("libnative-lib.so"), true)
-        val module = dm.module
+        module = dm.module
 
-        symbol = module.findSymbolByName("Java_com_starlightc_ucropplus_network_temp_TempEncodeUtil_encode")
+        symbol = module!!.findSymbolByName("Java_com_starlightc_ucropplus_network_temp_TempEncodeUtil_encode")
+
+        val functionAddress =  module!!.base + 0x2c94
+        val dobby = Dobby.getInstance(emulator)
+        var arg1 : UnidbgPointer? = null
+        dobby.replace(functionAddress, object : ReplaceCallback() {
+            // 使用Dobby inline hook导出函数
+            override fun onCall(emulator: Emulator<*>?, context: HookContext, originFunction: Long): HookStatus {
+                arg1 = context.getPointerArg(0)
+                return HookStatus.RET(emulator, originFunction)
+            }
+
+            override fun postCall(emulator: Emulator<*>?, context: HookContext) {
+                println("ss_encrypted_size.postCall ret=" + context.getIntArg(0))
+            }
+        }, true)
+
+
 
     }
     override fun callObjectMethod(

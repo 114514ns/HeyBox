@@ -2,8 +2,6 @@ package cn.pprocket.items;
 
 import cn.pprocket.HeyClient;
 import cn.pprocket.utils.ParamsBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lombok.Data;
@@ -26,6 +24,7 @@ public class Post {
     private int comments;
     private int likes;
     private String content = "";
+    private List<String> tags;
 
     public String fillContent() {
         Map<String, String> map = new HashMap<String, String>();
@@ -51,4 +50,5 @@ public class Post {
         return sb.toString();
 
     }
+
 }

@@ -17,7 +17,9 @@ class AppParamsBuilder(private val maps: Map<String, String>) {
 
     fun build(path:String): String {
         var time = (System.currentTimeMillis() / 1000).toString()
+        //val time = "1721618176"
         val hash = nonce()
+        //val hash = "mcfuUBmVtL9fXAFIXoQsOLBYNOFFuzCt"
         val builtin = mapOf(
             "imei" to "58dcf9f48bba35a",
             "device_info" to "M2104K10AC",
