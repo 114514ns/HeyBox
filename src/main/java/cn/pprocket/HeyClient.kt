@@ -31,6 +31,7 @@ object HeyClient : Client {
     val cleanClient = OkHttpClient.Builder().build()
     val appClient = OkHttpClient.Builder().addInterceptor(HeyInterceptor()).build()
     var scriptContent = ""
+    var user = User()
 
     override fun login(cookie: String) {
         this.cookie = cookie
@@ -431,7 +432,14 @@ object HeyClient : Client {
         )
         val url = "https://api.xiaoheihe.cn/account/qr_state?${ParamsBuilder(params).build("/account/qr_state/")}"
         val str = get(url)
-        return str.contains("登录成功")
+        if (str.contains("登录成功")) {
+            var jsonObject = JsonParser.parseString(str).asJsonObject
+            user.userId = jsonObject["heyboxid"].asString
+            user.userName = jsonObject["nickname"].asString
+            user.avatar = jsonObject["avatar"].asString
+            return true
+        }
+        return false
     }
 
     fun get(url: String): String {

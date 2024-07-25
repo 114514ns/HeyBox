@@ -9,7 +9,12 @@ import java.io.File
 fun main() {
 
     HeyClient.login(File("cookie.txt").readText().replace("[\r\n]".toRegex(), ""))
-    HeyClient.reply("128929489","test")
+    val url = HeyClient.genQRCode()
+    println(url)
+    while (true) {
+        HeyClient.checkLogin(url)
+        Thread.sleep(1000)
+    }
 
 
 }
