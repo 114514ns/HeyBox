@@ -183,8 +183,24 @@ object HeyClient : Client {
         }
         post.description = Jsoup.parse(obj.get("description").asString).text()
         val list = mutableListOf<String>()
-        obj.get("imgs").asJsonArray.forEach {
-            list.add(it.asString.replace("webp", "jpg"))
+
+        if (obj.has("imgs")) {
+            obj.get("imgs").asJsonArray.forEach {
+                list.add(it.asString.replace("webp", "jpg"))
+            }
+        } else {
+            JsonParser.parseString(obj.get("text").asString).asJsonArray.forEach {
+                var jsonObject = it.asJsonObject
+                /*
+                if (jsonObject.has("text")) {
+                    builder.append(jsonObject.get("text").asString, "\n")
+                }
+
+                 */
+                if (jsonObject.has("url")) {
+                    list.add(jsonObject.get("url").asString)
+                }
+            }
         }
         post.images = list
         if (obj.has("create_str")) {
@@ -218,47 +234,17 @@ object HeyClient : Client {
 
     override fun getPost(id: String): Post {
         val params = mapOf(
-            "link_id" to id
+            "link_id" to id,
+            "page" to "1",
+            "limit" to "10"
         )
         val url =
-            "https://api.xiaoheihe.cn/bbs/app/api/share/data/?${ParamsBuilder(params).build("/bbs/app/api/share/data/")}"
+            "https://api.xiaoheihe.cn/bbs/app/link/tree/?${ParamsBuilder(params).build("/bbs/app/link/tree/")}"
         val res = get(url)
-        val post = parseWebPost(JsonParser.parseString(res).asJsonObject.getAsJsonObject("link"))
+        val post = parsePost(JsonParser.parseString(res).asJsonObject.getAsJsonObject("link"))
         return post
     }
 
-    fun parseWebPost(obj: JsonObject): Post {
-        val post = Post()
-        post.title = obj.get("title").asString
-        post.postId = obj.get("linkid").asString
-        post.tags = mutableListOf()
-        obj.get("hashtags").asJsonArray.forEach {
-            post.tags.add(it.asString)
-        }
-        val builder = StringBuilder()
-        val images = mutableListOf<String>()
-        obj.getAsJsonArray("content").forEach {
-            var jsonObject = it.asJsonObject
-            if (jsonObject.has("text")) {
-                builder.append(jsonObject.get("text").asString, "\n")
-            }
-            if (jsonObject.has("url")) {
-                images.add(jsonObject.get("url").asString)
-            }
-        }
-        post.images = images
-        post.content = builder.toString()
-        post.userName = obj.getAsJsonObject("poster").get("username").asString
-        post.userAvatar = obj.getAsJsonObject("poster").get("avatar").asString
-        post.userId = obj.getAsJsonObject("poster").get("userid").asString
-        post.createAt = parseTime(obj.get("create_at").asFloat.toLong()*1000)
-        post.tags = mutableListOf()
-        obj.getAsJsonArray("content_tags").forEach {
-            post.tags.add(it.asJsonObject.get("text").asString)
-        }
-        return post
-
-    }
 
     override fun getGame(id: String): Game {
         var time = (System.currentTimeMillis() / 1000).toString()
@@ -376,23 +362,20 @@ object HeyClient : Client {
     }
 
     override fun reply(postId: String, text: String, rootId: String?) {
-        var builder = FormBody.Builder()
-        builder.add("link_id", postId)
-        builder.add("text", text)
-        if (rootId != null) {
-            builder.add("root_id", rootId)
-            builder.add("reply_id", rootId)
-        } else {
-            builder.add("root_id", "-1")
-            builder.add("reply_id", "-1")
-        }
-        builder.add("is_cy", "0")
+        val formBody = FormBody.Builder()
+            .add("link_id", postId)
+            .add("text", text)
+            .add("root_id", rootId ?: "-1")
+            .add("reply_id", rootId ?: "-1")
+            .add("imgs", "")
+            .add("is_cy", "0")
+            .build()
         val params = mapOf<String, String>()
         val url =
             "https://api.xiaoheihe.cn/bbs/app/comment/create?${ParamsBuilder(params).build("/bbs/app/comment/create/")}"
         val request = Request.Builder()
             .url(url)
-            .post(builder.build())
+            .post(formBody)
             .build()
         var string = client.newCall(request).execute().body!!.string()
         println(string)
@@ -532,6 +515,7 @@ class HeyInterceptor : Interceptor {
         var url = chain.request().url.toUrl().toString()
         var newBuilder = chain.request().newBuilder()
         newBuilder.addHeader("Cookie", HeyClient.cookie)
+        newBuilder.addHeader("Referer","https://xiaoheihe.cn/")
         val response = chain.proceed(newBuilder.build())
         // 获取原始响应内容
         val originalBody = response.body ?: return response

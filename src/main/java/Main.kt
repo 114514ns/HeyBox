@@ -9,7 +9,7 @@ import java.io.File
 fun main() {
 
     HeyClient.login(File("cookie.txt").readText().replace("[\r\n]".toRegex(), ""))
-    HeyClient.getPost("126188881")
+    HeyClient.reply("128929489","test")
 
 
 }
