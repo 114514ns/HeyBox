@@ -30,6 +30,7 @@ public class Comment {
     private String postId;
     private List<Comment> subComments;
     private Post extraPost;
+    private boolean liked;
 
     public List<Comment> fillSubComments() {
         if (!hasMore) return subComments;

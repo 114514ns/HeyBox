@@ -379,7 +379,6 @@ object HeyClient : Client {
             .post(formBody)
             .build()
         var string = client.newCall(request).execute().body!!.string()
-        println(string)
     }
 
     override fun genQRCode(): String {
@@ -419,6 +418,7 @@ object HeyClient : Client {
         comment.likes = json.get("up").asInt
         comment.images = images
         comment.createdAt = parseTime(json.get("create_at").asString.toLong() * 1000)
+        comment.isLiked = json.get("is_support").asString == "1"
         return comment
 
     }
@@ -440,6 +440,18 @@ object HeyClient : Client {
             return true
         }
         return false
+    }
+
+    override fun like(commentId: String) {
+        val params = mapOf<String, String>()
+        val url =
+            "https://api.xiaoheihe.cn/bbs/app/comment/support?${ParamsBuilder(params).build("/bbs/app/comment/support/")}"
+        val formBody = FormBody.Builder()
+            .add("comment_id",commentId)
+            .add("support_type","1")
+            .build()
+        client.newCall(Request.Builder().post(formBody).url(url).build()).execute()
+
     }
 
     fun get(url: String): String {
@@ -523,7 +535,7 @@ class HeyInterceptor : Interceptor {
         var url = chain.request().url.toUrl().toString()
         var newBuilder = chain.request().newBuilder()
         newBuilder.addHeader("Cookie", HeyClient.cookie)
-        newBuilder.addHeader("Referer","https://xiaoheihe.cn/")
+        newBuilder.addHeader("Referer","https://chat.xiaoheihe.cn/")
         val response = chain.proceed(newBuilder.build())
         // 获取原始响应内容
         val originalBody = response.body ?: return response

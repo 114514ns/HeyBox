@@ -16,5 +16,6 @@ interface Client {
     fun reply(postId: String, text: String, rootId: String? = null)
     fun genQRCode(): String
     fun checkLogin(url:String): Boolean
+    fun like(commentId: String)
 
 }
