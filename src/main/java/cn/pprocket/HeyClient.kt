@@ -1,26 +1,31 @@
 package cn.pprocket
 
 import cn.pprocket.items.*
+import cn.pprocket.utils.Encrypt
 import cn.pprocket.utils.ParamsBuilder
 import cn.pprocket.utils.SignGenerator
-
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import com.google.gson.Strictness
-import com.google.gson.stream.JsonReader
 import okhttp3.*
-import okhttp3.MediaType.Companion.parse
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okio.Buffer
+import okio.BufferedSink
 import okio.BufferedSource
 import org.example.cn.pprocket.utils.app.AppParamsBuilder
-import org.example.cn.pprocket.utils.app.AppSignGenerator
 import org.jsoup.Jsoup
-import java.net.InetSocketAddress
-import java.net.Proxy
+import java.awt.Image
+import java.awt.image.BufferedImage
+import java.awt.image.RenderedImage
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.IOException
 import java.net.URL
 import java.util.*
 import java.util.concurrent.TimeUnit
+import javax.imageio.ImageIO
+
 
 object HeyClient : Client {
     private val client = OkHttpClient.Builder()
@@ -32,6 +37,7 @@ object HeyClient : Client {
     val appClient = OkHttpClient.Builder().addInterceptor(HeyInterceptor()).build()
     var scriptContent = ""
     var user = User()
+    val cosClient = OkHttpClient.Builder().build()
 
     override fun login(cookie: String) {
         this.cookie = cookie
@@ -156,6 +162,9 @@ object HeyClient : Client {
             if (!it.toString().substring(0, 25).contains("banner")) {
                 val obj = it.asJsonObject
                 val post = parsePost(obj)
+                if (topic.id == -1) {
+                    post.isHTML = true
+                }
                 if (post.title != null) {
                     posts.add(post)
                 }
@@ -418,9 +427,69 @@ object HeyClient : Client {
         comment.likes = json.get("up").asInt
         comment.images = images
         comment.createdAt = parseTime(json.get("create_at").asString.toLong() * 1000)
-        comment.isLiked = json.get("is_support").asString == "1"
+        if (json.has("is_support")) {
+            comment.isLiked = json.get("is_support").asString == "1"
+        }
         return comment
 
+    }
+
+    override fun uploadImage(image: Image) {
+
+
+        val params = mapOf<String, String>()
+        val type = "application/json; charset=utf-8".toMediaType()
+        val content = RequestBody.create(
+            type,
+            "{\"type\":\"pic\",\"source\":\"post_img\",\"upload_infos\":[{\"ext\":\"png\",\"file_size\":1.8277034759521484}]}"
+        )
+        val url =
+            "https://chat.xiaoheihe.cn/chatroom/v2/common/cos/upload/token?${ParamsBuilder(params).build("/chatroom/v2/common/cos/upload/token/")}"
+        val str = client.newCall(Request.Builder().url(url).post(content).build()).execute().body!!.string()
+        val obj = JsonParser.parseString(str).asJsonObject["info"].asJsonObject
+        val token = obj["token"].asJsonObject
+        val credentials = token["credentials"].asJsonObject
+
+        val startTime = token.get("startTime").asInt
+        val expiredTime = token.get("expiredTime").asInt
+        val sessionToken = credentials["sessionToken"].asString
+        val tmpSecretId = credentials["tmpSecretId"].asString
+        val tmpSecretKey = credentials["tmpSecretKey"].asString
+        val path =
+            "https://${obj["bucket"].asString}.cos.ap-shanghai.myqcloud.com${obj["key"].asString}"
+
+        val MEDIA_TYPE_JPG = "image/jpeg".toMediaType()
+        val byteArray: ByteArray? = try {
+            val baos = ByteArrayOutputStream()
+            ImageIO.write(toBufferedImage(image), "jpg", baos) // "jpg" 可以根据实际图像类型调整
+            baos.toByteArray()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+        val request = Request.Builder()
+            .url(path)
+            .put(RequestBody.create(MEDIA_TYPE_JPG,byteArray!!))
+            .addHeader("x-cos-security-token", sessionToken)
+
+
+        val signKey = Encrypt.HMAC_SHA1("${startTime};${expiredTime}", tmpSecretKey)
+
+        val httpStringBuilder = StringBuilder()
+        httpStringBuilder.append("put\n")
+        httpStringBuilder.append(URL(path).path).append("\n\n")
+        httpStringBuilder.append("content-length=${byteArray!!.size}&host=chat-1251007209.cos.ap-shanghai.myqcloud.com").append("\n")
+
+        val httpString = httpStringBuilder.toString()
+        val StringToSign = "sha1\n${startTime};${expiredTime}\n${Encrypt.SHA1(httpString)}\n"
+
+        val sign = Encrypt.HMAC_SHA1(StringToSign,signKey)
+
+        val template = "q-sign-algorithm=sha1&q-ak=${tmpSecretId}&q-sign-time=${startTime};${expiredTime}&q-key-time=${startTime};${expiredTime}&q-header-list=content-length;host&q-url-param-list=&q-signature=${sign}"
+        request.addHeader("Authorization", template)
+        println(path)
+        val res = cosClient.newCall(request.build()).execute().body!!.string()
+        println(res)
     }
 
     override fun checkLogin(raw: String): Boolean {
@@ -447,8 +516,8 @@ object HeyClient : Client {
         val url =
             "https://api.xiaoheihe.cn/bbs/app/comment/support?${ParamsBuilder(params).build("/bbs/app/comment/support/")}"
         val formBody = FormBody.Builder()
-            .add("comment_id",commentId)
-            .add("support_type","1")
+            .add("comment_id", commentId)
+            .add("support_type", "1")
             .build()
         client.newCall(Request.Builder().post(formBody).url(url).build()).execute()
 
@@ -485,6 +554,18 @@ object HeyClient : Client {
     }
 
 
+}
+fun toBufferedImage(img: Image): BufferedImage {
+    if (img is BufferedImage) {
+        return img
+    }
+    // 创建一个 BufferedImage
+    val bufferedImage = BufferedImage(img.getWidth(null), img.getHeight(null), BufferedImage.TYPE_INT_RGB)
+    // 将 Image 绘制到 BufferedImage
+    val g2 = bufferedImage.createGraphics()
+    g2.drawImage(img, 0, 0, null)
+    g2.dispose()
+    return bufferedImage
 }
 
 fun parseTime(timeInMillis: Long): String {
@@ -535,7 +616,7 @@ class HeyInterceptor : Interceptor {
         var url = chain.request().url.toUrl().toString()
         var newBuilder = chain.request().newBuilder()
         newBuilder.addHeader("Cookie", HeyClient.cookie)
-        newBuilder.addHeader("Referer","https://chat.xiaoheihe.cn/")
+        newBuilder.addHeader("Referer", "https://chat.xiaoheihe.cn/")
         val response = chain.proceed(newBuilder.build())
         // 获取原始响应内容
         val originalBody = response.body ?: return response

@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "cn.pprocket"
-version = "240725-4"
+version = "240727-8"
 
 repositories {
     mavenCentral()
@@ -34,6 +34,7 @@ dependencies {
     implementation("org.jsoup:jsoup:1.15.3")
     implementation("com.github.zhkl0228:unidbg-parent:0.9.7")
     implementation("com.github.zhkl0228:unidbg-android:0.9.7")
+
     compileOnly("org.projectlombok:lombok:1.18.32")
     annotationProcessor("org.projectlombok:lombok:1.18.32")
     testImplementation(kotlin("test"))
@@ -43,7 +44,7 @@ tasks.test {
     useJUnitPlatform()
 }
 kotlin {
-    jvmToolchain(8)
+    jvmToolchain(11)
 }
 val sourceJar by tasks.registering(Jar::class) {
     archiveClassifier.set("sources")

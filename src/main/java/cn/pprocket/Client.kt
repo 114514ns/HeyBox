@@ -5,6 +5,7 @@ import cn.pprocket.items.Game
 import cn.pprocket.items.Post
 import cn.pprocket.items.Topic
 import cn.pprocket.items.User
+import java.awt.Image
 
 interface Client {
     fun login(cookie: String)
@@ -17,5 +18,6 @@ interface Client {
     fun genQRCode(): String
     fun checkLogin(url:String): Boolean
     fun like(commentId: String)
+    fun uploadImage(image: Image)
 
 }
