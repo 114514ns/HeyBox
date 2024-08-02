@@ -15,6 +15,11 @@ import com.github.unidbg.linux.android.dvm.api.Signature
 import com.github.unidbg.linux.android.dvm.array.ArrayObject
 import com.github.unidbg.pointer.UnidbgPointer
 import java.io.File
+import java.io.FileNotFoundException
+import java.io.FileOutputStream
+import java.io.PrintStream
+import java.nio.charset.StandardCharsets
+import java.util.function.Consumer
 
 
 object AppSignGenerator :AbstractJni() {
@@ -50,7 +55,7 @@ object AppSignGenerator :AbstractJni() {
         val result = vm!!.getObject<DvmObject<*>>(number.toInt()).value.toString()
 
         println("Sign took ${System.currentTimeMillis() - start} ms")
-
+        println(result)
         return result
     }
 
@@ -63,31 +68,80 @@ object AppSignGenerator :AbstractJni() {
 
         vm = emulator!!.createDalvikVM(File("heybox.apk"))
 
-        vm!!.setVerbose(false)
+        vm!!.setVerbose(true)
         vm!!.setJni(this)
         val dm = vm!!.loadLibrary(File("libnative-lib.so"), true)
         module = dm.module
 
         symbol = module!!.findSymbolByName("Java_com_starlightc_ucropplus_network_temp_TempEncodeUtil_encode")
 
-        val functionAddress =  module!!.base + 0x2c94
+        var functionAddress =  module!!.base + 0x2c94
+        //functionAddress =  module!!.findSymbolByName("atoi").address
         val dobby = Dobby.getInstance(emulator)
         var arg1 : UnidbgPointer? = null
+        var arg2 : UnidbgPointer? = null
+        var arg3 : UnidbgPointer? = null
+
+        val traceFile = "myTraceCodeFile"
+        var traceStream: PrintStream? = null
+
+        try {
+            traceStream = PrintStream(FileOutputStream(traceFile), true)
+        } catch (e: FileNotFoundException) {
+            e.printStackTrace()
+        }
+        emulator!!.traceCode(module!!.base+0x3900, module!!.base+0x3a54).setRedirect(traceStream)
+        emulator!!.attach().addBreakPoint(module!!.base + 0x3958)
+        //emulator!!.traceWrite(module!!.base+0x3a44, module!!.base +0x3a44+8).setRedirect(traceStream);
+
+
         dobby.replace(functionAddress, object : ReplaceCallback() {
             // 使用Dobby inline hook导出函数
             override fun onCall(emulator: Emulator<*>?, context: HookContext, originFunction: Long): HookStatus {
                 arg1 = context.getPointerArg(0)
+                arg2 = context.getPointerArg(1)
+                arg3 = context.getPointerArg(2)
+
                 return HookStatus.RET(emulator, originFunction)
             }
 
             override fun postCall(emulator: Emulator<*>?, context: HookContext) {
-                println("ss_encrypted_size.postCall ret=" + context.getIntArg(0))
+                //println("ss_encrypted_size.postCall ret=" + context.getIntArg(0))
+                println("HMAC-SHA1 ${arg1!!.getByteArray(0,20).toHexString()}")
             }
         }, true)
 
-
-
     }
+
+    fun dumpStrings(start: Long, end: Long,emulator: AndroidEmulator) {
+        val foundStrings: MutableSet<String> = HashSet()
+
+        // 读取内存中的所有块
+        var address = start
+        while (address < end) {
+            // 假设页面大小为0x1000
+            try {
+                val data: ByteArray = emulator.backend.mem_read(address, 0x1000)
+                val blockString = String(data, StandardCharsets.UTF_8)
+
+                // 使用正则表达式提取可打印字符串
+                val strings = blockString.split("[^\\p{Print}]+".toRegex()).dropLastWhile { it.isEmpty() }
+                    .toTypedArray()
+                for (str in strings) {
+                    if (str.length > 3) { // 过滤掉短的字符串
+                        foundStrings.add(str)
+                    }
+                }
+            } catch (e: Exception) {
+                // 忽略不可读的内存块
+            }
+            address += 0x1000
+        }
+
+        // 打印找到的所有字符串
+        foundStrings.forEach(Consumer { x: String? -> println(x) })
+    }
+
     override fun callObjectMethod(
         vm: BaseVM?,
         dvmObject: DvmObject<*>?,

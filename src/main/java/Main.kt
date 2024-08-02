@@ -1,6 +1,9 @@
 package org.example
 
 import cn.pprocket.HeyClient
+import cn.pprocket.HeyClient.getFollowers
+import cn.pprocket.items.Topic
+import org.example.cn.pprocket.utils.app.AppSignGenerator
 import java.awt.Image
 import java.awt.Toolkit
 import java.awt.datatransfer.Clipboard
@@ -11,7 +14,9 @@ import java.io.File
 fun main() {
 
     HeyClient.login(File("cookie.txt").readText().replace("[\r\n]".toRegex(), ""))
-    HeyClient.getCloudToken(getImageFromClipboard()!!)
+    var time = System.currentTimeMillis()/1000
+    time = 1722566880
+    AppSignGenerator.hkey("/bbs/app/feeds/", time.toString(),"262088DD2A869D06DE2FF8ACE593AC24")
 
 }
 @Throws(Exception::class)

@@ -14,10 +14,10 @@ interface Client {
     fun getPost(id: String): Post
     fun getGame(id: String): Game
     fun getComments(postId: String, page: Int): List<Comment>
-    fun reply(postId: String, text: String, rootId: String? = null)
+    fun reply(postId: String, text: String, rootId: String? = null,images: List<String> = emptyList())
     fun genQRCode(): String
     fun checkLogin(url:String): Boolean
     fun like(commentId: String)
-    fun uploadImage(image: Image)
+    fun uploadImage(image: Image):String
 
 }

@@ -1,5 +1,6 @@
 package cn.pprocket
 
+import cn.pprocket.HeyClient.getFollowers
 import cn.pprocket.items.*
 import cn.pprocket.utils.Encrypt
 import cn.pprocket.utils.ParamsBuilder
@@ -38,6 +39,7 @@ object HeyClient : Client {
     var scriptContent = ""
     var user = User()
     val cosClient = OkHttpClient.Builder().build()
+    var debug = false
 
     override fun login(cookie: String) {
         this.cookie = cookie
@@ -57,7 +59,7 @@ object HeyClient : Client {
         val bbs = obj.getAsJsonObject("bbs_info")
         user.posts = bbs.get("post_link_num").asInt
         user.location = obj.get("ip_location").asString
-        user.followers = bbs.get("follow_num").asInt
+        user.followings = bbs.get("follow_num").asInt
         user.signature = obj.get("signature").asString
         user.followers = bbs.get("fan_num").asInt
         user.userId = obj.get("userid").asString
@@ -180,7 +182,7 @@ object HeyClient : Client {
         }
 
 
-        post.title = obj.get("title").asString
+        post.title = Jsoup.parse(obj.get("title").asString).text()
         post.postId = obj.get("linkid").asString
         post.userId = obj.get("userid").asString
 
@@ -224,14 +226,13 @@ object HeyClient : Client {
         }
         post.tags = mutableListOf()
 
-        if (obj.has("bottom_rich_text")) {
-            obj["bottom_rich_text"].asJsonObject["models"].asJsonArray.forEach {
-                val v0 = it.asJsonObject["attrs"].asJsonArray[0].asJsonObject
-                if (v0["type"].asString == "text") {
-                    if (v0["text"].asString != ".") {
-                        post.tags.add(v0["text"].asString)
-                    }
-                }
+        if (obj.has("topics")) {
+            obj["topics"].asJsonArray.forEach {
+                val topic = Topic()
+                topic.id = it.asJsonObject.get("topic_id").asInt
+                topic.name = it.asJsonObject.get("name").asString
+                topic.icon = it.asJsonObject.get("pic_url").asString
+                post.tags.add(topic)
 
             }
         }
@@ -271,11 +272,13 @@ object HeyClient : Client {
         val obj = JsonParser.parseString(string).asJsonObject.getAsJsonObject("result")
         val game = Game()
         game.isFree = obj.get("is_free").asBoolean
-        game.rating = obj.get("score").asDouble
+        // game.rating = obj.get("score").asDouble
         game.name = obj.get("name").asString
         game.description = obj.get("about_the_game").asString
         game.price = if (game.isFree) 0.0 else obj.get("price").asJsonObject.get("current").asDouble
         game.lowest = if (game.isFree) 0.0 else obj.get("price").asJsonObject.get("lowest_price").asDouble
+        val discount = obj.getAsJsonObject("price").get("discount").asString
+        game.discount = if (discount == "0") "0" else "-${discount}%"
         val arr = obj.getAsJsonObject("user_num").getAsJsonArray("game_data")
         val statistic = Game.Statistic()
 
@@ -309,6 +312,7 @@ object HeyClient : Client {
         }
         game.awards = awards
         val screenshots = mutableListOf<String>()
+        screenshots.add(obj.get("image").asString)
         obj.getAsJsonArray("screenshots").forEach {
             val o = it.asJsonObject
             screenshots.add(o.get("url").asString)
@@ -371,13 +375,18 @@ object HeyClient : Client {
         return comments
     }
 
-    override fun reply(postId: String, text: String, rootId: String?) {
+    override fun reply(postId: String, text: String, rootId: String?, images: List<String>) {
+        var img = ""
+        images.forEach {
+            img += "${it};"
+        }
+        img = if (img.isEmpty()) "" else img.substring(0, img.length - 1)
         val formBody = FormBody.Builder()
             .add("link_id", postId)
             .add("text", text)
             .add("root_id", rootId ?: "-1")
             .add("reply_id", rootId ?: "-1")
-            .add("imgs", "")
+            .add("imgs", img)
             .add("is_cy", "0")
             .build()
         val params = mapOf<String, String>()
@@ -430,11 +439,14 @@ object HeyClient : Client {
         if (json.has("is_support")) {
             comment.isLiked = json.get("is_support").asString == "1"
         }
+        if (debug) {
+            HeyDebugger.commentList.add(comment)
+        }
         return comment
 
     }
 
-    override fun uploadImage(image: Image) {
+    override fun uploadImage(image: Image): String {
 
 
         val params = mapOf<String, String>()
@@ -469,7 +481,7 @@ object HeyClient : Client {
         }
         val request = Request.Builder()
             .url(path)
-            .put(RequestBody.create(MEDIA_TYPE_JPG,byteArray!!))
+            .put(RequestBody.create(MEDIA_TYPE_JPG, byteArray!!))
             .addHeader("x-cos-security-token", sessionToken)
 
 
@@ -478,18 +490,20 @@ object HeyClient : Client {
         val httpStringBuilder = StringBuilder()
         httpStringBuilder.append("put\n")
         httpStringBuilder.append(URL(path).path).append("\n\n")
-        httpStringBuilder.append("content-length=${byteArray!!.size}&host=chat-1251007209.cos.ap-shanghai.myqcloud.com").append("\n")
+        httpStringBuilder.append("content-length=${byteArray!!.size}&host=chat-1251007209.cos.ap-shanghai.myqcloud.com")
+            .append("\n")
 
         val httpString = httpStringBuilder.toString()
         val StringToSign = "sha1\n${startTime};${expiredTime}\n${Encrypt.SHA1(httpString)}\n"
 
-        val sign = Encrypt.HMAC_SHA1(StringToSign,signKey)
+        val sign = Encrypt.HMAC_SHA1(StringToSign, signKey)
 
-        val template = "q-sign-algorithm=sha1&q-ak=${tmpSecretId}&q-sign-time=${startTime};${expiredTime}&q-key-time=${startTime};${expiredTime}&q-header-list=content-length;host&q-url-param-list=&q-signature=${sign}"
+        val template =
+            "q-sign-algorithm=sha1&q-ak=${tmpSecretId}&q-sign-time=${startTime};${expiredTime}&q-key-time=${startTime};${expiredTime}&q-header-list=content-length;host&q-url-param-list=&q-signature=${sign}"
         request.addHeader("Authorization", template)
-        println(path)
+
         val res = cosClient.newCall(request.build()).execute().body!!.string()
-        println(res)
+        return path
     }
 
     override fun checkLogin(raw: String): Boolean {
@@ -523,6 +537,48 @@ object HeyClient : Client {
 
     }
 
+    fun User.getFollowers(page: Int): List<User> {
+        val params = mapOf(
+            "userid" to this.userId,
+            "limit" to "30",
+            "offset" to "${(page - 1) * 30}"
+        )
+        val url =
+            "https://api.xiaoheihe.cn/bbs/app/profile/following/list?${ParamsBuilder(params).build("/bbs/app/profile/following/list/")}"
+        val str = get(url)
+        val json = JsonParser.parseString(str).asJsonObject
+        val list = mutableListOf<User>()
+        json.getAsJsonArray("follow_list").forEach {
+            val user = User()
+            user.avatar = it.asJsonObject.get("avatar").asString
+            user.userName = it.asJsonObject.get("username").asString
+            user.userId = it.asJsonObject.get("userid").asString
+            list.add(user)
+        }
+        return list
+    }
+
+    fun User.getFollowings(page: Int): List<User> {
+        val params = mapOf(
+            "userid" to this.userId,
+            "limit" to "30",
+            "offset" to "${(page - 1) * 30}"
+        )
+        val url =
+            "https://api.xiaoheihe.cn/bbs/app/profile/follower/list?${ParamsBuilder(params).build("/bbs/app/profile/follower/list/")}"
+        val str = get(url)
+        val json = JsonParser.parseString(str).asJsonObject
+        val list = mutableListOf<User>()
+        json.getAsJsonArray("follow_list").forEach {
+            val user = User()
+            user.avatar = it.asJsonObject.get("avatar").asString
+            user.userName = it.asJsonObject.get("username").asString
+            user.userId = it.asJsonObject.get("userid").asString
+            list.add(user)
+        }
+        return list
+    }
+
     fun get(url: String): String {
         var string = client.newCall(
             Request.Builder()
@@ -531,6 +587,44 @@ object HeyClient : Client {
                 .build()
         ).execute().body!!.string()
         return string
+    }
+
+    fun searchSuggestion(keyword: String):List<String> {
+        val params = mapOf(
+            "q" to keyword,
+        )
+        val list = mutableListOf<String>()
+        val url =
+            "https://api.xiaoheihe.cn/bbs/app/api/search/suggestion/v2?${ParamsBuilder(params).build("/bbs/app/api/search/suggestion/v2/")}"
+        val str = get(url)
+        val obj = JsonParser.parseString(str).asJsonObject
+        obj.getAsJsonArray("suggestions").forEach {
+            list.add(it.asJsonObject.get("text").asString)
+        }
+        return list
+    }
+
+    fun searchPost(key: String, page: Int) :List<Post>{
+        val params = mapOf(
+            "q" to key,
+            "search_type" to "link",
+            "limit" to "30",
+            "offset" to "${(page - 1) * 30}",
+            "time_range" to "",
+            "sort_filter" to "sort_filter"
+        )
+        val list = mutableListOf<Post>()
+        val url = "https://api.xiaoheihe.cn/bbs/app/api/general/search/v1?${ParamsBuilder(params).build("/bbs/app/api/general/search/v1/")}"
+        val str = get(url)
+        val obj = JsonParser.parseString(str).asJsonObject
+        val items = obj.getAsJsonArray("items")
+        items.forEach {
+            val o = it.asJsonObject
+            if (o.get("type").asString == "link") {
+                list.add(parsePost(o.get("info").asJsonObject))
+            }
+        }
+        return list
     }
 
     private fun directGet(url: String): String {
@@ -555,6 +649,7 @@ object HeyClient : Client {
 
 
 }
+
 fun toBufferedImage(img: Image): BufferedImage {
     if (img is BufferedImage) {
         return img
@@ -604,7 +699,9 @@ fun parseTime(timeInMillis: Long): String {
         }
     }
 }
-
+object HeyDebugger {
+    val commentList = mutableListOf<Comment>()
+}
 
 class HeyInterceptor : Interceptor {
 

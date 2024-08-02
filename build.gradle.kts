@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "cn.pprocket"
-version = "240727-8"
+version = "240802-2"
 
 repositories {
     mavenCentral()

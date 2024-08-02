@@ -2,10 +2,14 @@ package cn.pprocket.items;
 
 import cn.pprocket.HeyClient;
 import cn.pprocket.utils.ParamsBuilder;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.SneakyThrows;
+import okhttp3.Request;
+import org.example.cn.pprocket.utils.app.AppParamsBuilder;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,16 +32,25 @@ public class Topic {
     public static Topic RECOMMEND = new Topic("推荐", -2,"");
     public static Topic MAX = new Topic("Max家", 475512,"");
 
+    @SneakyThrows
     public static List<Topic> getTopics() {
         Map<String, String> params = new HashMap<String, String>();
-        String url = "https://api.xiaoheihe.cn/bbs/app/topic/categories?" + new ParamsBuilder(params).build("/bbs/app/topic/categories/");
+        params.put("type","list");
+        params.put("is_post","1");
+        params.put("post_tab","1");
+        String url = "https://api.xiaoheihe.cn/bbs/app/api/topic/index?" + new ParamsBuilder(params).build("/bbs/app/api/topic/index/");
         String string = HeyClient.INSTANCE.get(url);
         List<Topic> topics = new ArrayList<>();
-        JsonParser.parseString(string).getAsJsonObject().getAsJsonObject("latest_hot_topics").getAsJsonArray("children").forEach(e -> {
-            Topic topic = new Topic(e.getAsJsonObject().get("name").getAsString(),
-                    e.getAsJsonObject().get("topic_id").getAsInt(),
-                    e.getAsJsonObject().get("small_pic_url").getAsString());
-            topics.add(topic);
+        JsonParser.parseString(string).getAsJsonObject().getAsJsonArray("topics_list").forEach(e -> {
+            e.getAsJsonObject().getAsJsonArray("children").forEach( e0 -> {
+                JsonObject e1 = e0.getAsJsonObject();
+
+                Topic topic = new Topic();
+                topic.setId(e1.get("topic_id").getAsInt());
+                topic.setName(e1.get("name").getAsString());
+                topic.setIcon(e1.get("pic_url").getAsString());
+                topics.add(topic);
+            });
         });
         return topics;
     }

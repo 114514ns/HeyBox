@@ -29,7 +29,7 @@ public class Post {
     private int comments;
     private int likes;
     private String content = "";
-    private List<String> tags;
+    private List<Topic> tags;
     private boolean isHTML = false;
 
     public String fillContent() {
@@ -42,14 +42,18 @@ public class Post {
         String res = HeyClient.INSTANCE.get(url);
         JsonObject parsed = JsonParser.parseString(res).getAsJsonObject().getAsJsonObject("link");
         StringBuilder builder = new StringBuilder();
+        try {
+            JsonParser.parseString(parsed.get("text").getAsString()).getAsJsonArray().forEach(ele -> {
+                JsonObject object = ele.getAsJsonObject();
+                if (object.get("type").getAsString().equals("text")) {
+                    builder.append(object.get("text").getAsString()).append("\n");
+                }
+            });
+            return builder.toString();
+        } catch (Exception e) {
+            return this.description;
+        }
 
-        JsonParser.parseString(parsed.get("text").getAsString()).getAsJsonArray().forEach(ele -> {
-            JsonObject object = ele.getAsJsonObject();
-            if (object.get("type").getAsString().equals("text")) {
-                builder.append(object.get("text").getAsString()).append("\n");
-            }
-        });
-        return builder.toString();
     }
 
     public List<Tag> renderHTML() {
@@ -74,8 +78,14 @@ public class Post {
                     tag.setTagValue(ele.text());
 
                 } else if (!ele.getElementsByTag("img").isEmpty()) {
-                    tag.setTagType("image");
-                    tag.setTagValue(ele.getElementsByTag("img").get(0).attr("data-original"));
+                    Element img = ele.getElementsByTag("img").get(0);
+                    if (img.hasAttr("data-original")) {
+                        tag.setTagType("image");
+                        tag.setTagValue(img.attr("data-original"));
+                    } else {
+                        tag.setTagType("gameCard");
+                        tag.setTagValue(img.attr("data-gameid"));
+                    }
                 } else if (ele.childNodes().get(0) instanceof TextNode) {
                     tag.setTagType("text");
                     tag.setTagValue(ele.text());
@@ -86,6 +96,12 @@ public class Post {
                     ele.childNodes().forEach(e -> {
 
                     });
+                } else if (!ele.getElementsByTag("a").isEmpty()) {
+                    tag.setTagType("link");
+                    tag.setTagValue(ele.attr("href"));
+                } else if (!ele.getElementsByTag("blockquote").isEmpty()) {
+                    tag.setTagType("ref");
+                    tag.setTagValue(ele.text());
                 }
                 tags.add(tag);
             }

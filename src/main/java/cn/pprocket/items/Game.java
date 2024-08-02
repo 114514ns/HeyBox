@@ -27,6 +27,7 @@ public class Game {
     private Statistic statistic;
     private List<String> awards;
     private List<String> screenshots;
+    private String discount;
 
 
 
