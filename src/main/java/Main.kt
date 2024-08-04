@@ -16,7 +16,8 @@ fun main() {
     HeyClient.login(File("cookie.txt").readText().replace("[\r\n]".toRegex(), ""))
     var time = System.currentTimeMillis()/1000
     time = 1722566880
-    AppSignGenerator.hkey("/bbs/app/feeds/", time.toString(),"262088DD2A869D06DE2FF8ACE593AC24")
+    //AppSignGenerator.hkey("/bbs/app/feeds/", time.toString(),"262088DD2A869D06DE2FF8ACE593AC24")
+    HeyClient.getPosts(Topic.RECOMMEND)
 
 }
 @Throws(Exception::class)

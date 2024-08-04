@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "cn.pprocket"
-version = "240802-2"
+version = "240804-1"
 
 repositories {
     mavenCentral()
@@ -32,9 +32,6 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("org.jsoup:jsoup:1.15.3")
-    implementation("com.github.zhkl0228:unidbg-parent:0.9.7")
-    implementation("com.github.zhkl0228:unidbg-android:0.9.7")
-
     compileOnly("org.projectlombok:lombok:1.18.32")
     annotationProcessor("org.projectlombok:lombok:1.18.32")
     testImplementation(kotlin("test"))

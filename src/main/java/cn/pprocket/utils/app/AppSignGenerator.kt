@@ -1,175 +1,211 @@
 package org.example.cn.pprocket.utils.app
 
-import com.github.unidbg.AndroidEmulator
-import com.github.unidbg.Emulator
-import com.github.unidbg.Module
-import com.github.unidbg.Symbol
-import com.github.unidbg.arm.HookStatus
-import com.github.unidbg.hook.HookContext
-import com.github.unidbg.hook.ReplaceCallback
-import com.github.unidbg.hook.hookzz.Dobby
-import com.github.unidbg.linux.android.AndroidEmulatorBuilder
-import com.github.unidbg.linux.android.AndroidResolver
-import com.github.unidbg.linux.android.dvm.*
-import com.github.unidbg.linux.android.dvm.api.Signature
-import com.github.unidbg.linux.android.dvm.array.ArrayObject
-import com.github.unidbg.pointer.UnidbgPointer
-import java.io.File
-import java.io.FileNotFoundException
-import java.io.FileOutputStream
-import java.io.PrintStream
-import java.nio.charset.StandardCharsets
-import java.util.function.Consumer
+
+import java.nio.ByteBuffer
+import java.security.InvalidKeyException
+import java.security.NoSuchAlgorithmException
+import java.util.*
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 
-object AppSignGenerator :AbstractJni() {
-    private var symbol: Symbol? = null
-    private var emulator: AndroidEmulator? = null
-    private var vm: VM? = null
-    private var flag = false
-    private var module: Module? = null
-    fun ByteArray.toHexString(): String {
-        return joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
-    }
+object AppSignGenerator {
+
     fun hkey(path: String, time: String, nonce: String): String {
+        val base64 = Base64.getEncoder().encodeToString(path.toByteArray())
+        val result = CharArray(7)
+        //HeyBox heyBox = new HeyBox();
+        //heyBox.init();
+        var timeNum = time.toLong()
+        var nums = 0
+        for (b in nonce.toByteArray()) {
+            if (b >= 48 && b <= 57) {
+                nums++
+            }
+        }
+        timeNum = timeNum + nums
+        val v24 = Char((timeNum shr 24).toUShort())
+        val v16 = Char((timeNum shr 16).toUShort())
+        val v8 = Char((timeNum shr 8).toUShort())
+        val bytes = ByteArray(8)
+        val v77 = ("23456789BCDFGHJKMNPQRTVWXY" + nonce.uppercase(Locale.getDefault())).toByteArray()
 
+        bytes[0] = 0.toByte()
+        bytes[1] = 0
+        bytes[2] = 0
+        bytes[3] = 0
+        bytes[4] = v24.code.toByte()
+        bytes[5] = v16.code.toByte()
+        bytes[6] = v8.code.toByte()
+        bytes[7] = timeNum.toByte()
+        val dist: ByteArray = genHMAC(bytes, base64.toByteArray())
+        val reverse = ByteArray(4)
+        val offset = dist[19].toInt() and 0xf
+        reverse[0] = dist[offset]
+        reverse[1] = dist[offset + 1]
+        reverse[2] = dist[offset + 2]
+        reverse[3] = dist[offset + 3]
+        val v34: Int = byteArrayToLong(reverse)
+        var v35: Int = bswap32(v34)
+        v35 = v34
+        val v36 = v35 and 0x7FFFFFFF
+        var v37 = 1307386003L * ((v35 shr 2) and 0x1FFFFFFF)
+        v37 = v77[((v37 shr 40) % 0x3A).toInt()].toLong()
+        val v38 = (v35 and 0x7FFFFFFF) / 0x3A
+        val v39 = v77[v36 - 58 * v38].toInt()
+        val v40 = v77[v38 % 0x3A].toInt()
+        val v41 = v77[v36 / 0x2FA28 % 0x3A].toInt()
+        val v42 = v77[v36 / 0xACAD10 % 0x3A].toInt()
+        result[0] = v39.toChar()
+        result[1] = v40.toChar()
+        result[2] = Char(v37.toUShort())
+        result[3] = v41.toChar()
+        result[4] = v42.toChar()
 
-        /*
-        var arg1 = emulator!!.memory.allocateStack(256)
-        var arg2 = emulator!!.memory.allocateStack(256)
-        arg2.write("200683".encodeToByteArray())
-        emulator!!.eFunc(module!!.base + 0x2df4,arg1.peer,arg2.peer,6)
-
-         */
-
-        val args: MutableList<Any> = ArrayList(10)
-        args.add(vm!!.jniEnv)
-        args.add(0)
-        args.add(vm!!.addLocalObject(vm!!.resolveClass("android.content.Context").newObject(null)))
-        args.add(vm!!.addLocalObject(StringObject(vm, path)))
-        args.add(vm!!.addLocalObject(StringObject(vm, time)))
-        args.add(vm!!.addLocalObject(StringObject(vm, nonce)))
-
-        val start = System.currentTimeMillis()
-        val number = symbol!!.call(emulator, *args.toTypedArray())
-        val result = vm!!.getObject<DvmObject<*>>(number.toInt()).value.toString()
-
-        println("Sign took ${System.currentTimeMillis() - start} ms")
-        println(result)
-        return result
+        val array = IntArray(4)
+        array[0] = result[1].code
+        array[1] = result[2].code
+        array[2] = result[3].code
+        array[3] = result[4].code
+        sub_249C(array)
+        val v43 = (array[0] + array[1] + array[2] + array[3]) % 100
+        val num = v43.toString().toByteArray()
+        result[6] = Char(num[1].toUShort())
+        if (v43 < 10) {
+            result[5] = 0.toChar()
+        } else {
+            result[5] = Char(num[0].toUShort())
+        }
+        return String(result)
     }
 
-    init {
-        emulator = AndroidEmulatorBuilder.for64Bit()
-            .setProcessName("com.qidian.dldl.official")
-            .build() // 创建模拟器实例，要模拟32位或者64位，在这里区分
-        val memory = emulator!!.memory // 模拟器的内存操作接口
-        memory.setLibraryResolver(AndroidResolver(23)) // 设置系统类库解析
 
-        vm = emulator!!.createDalvikVM(File("heybox.apk"))
+    fun bswap32(x: Int): Int {
+        return ((x shl 24) and -0x1000000) or
+                ((x shl 8) and 0x00ff0000) or
+                ((x shr 8) and 0x0000ff00) or
+                ((x shr 24) and 0x000000ff)
+    }
 
-        vm!!.setVerbose(true)
-        vm!!.setJni(this)
-        val dm = vm!!.loadLibrary(File("libnative-lib.so"), true)
-        module = dm.module
+    fun byteArrayToLong(bytes: ByteArray?): Int {
+        val buffer = ByteBuffer.wrap(bytes)
+        // 如果需要小端序，使用：buffer.order(ByteOrder.LITTLE_ENDIAN);
+        return buffer.getInt()
+    }
 
-        symbol = module!!.findSymbolByName("Java_com_starlightc_ucropplus_network_temp_TempEncodeUtil_encode")
 
-        var functionAddress =  module!!.base + 0x2c94
-        //functionAddress =  module!!.findSymbolByName("atoi").address
-        val dobby = Dobby.getInstance(emulator)
-        var arg1 : UnidbgPointer? = null
-        var arg2 : UnidbgPointer? = null
-        var arg3 : UnidbgPointer? = null
-
-        val traceFile = "myTraceCodeFile"
-        var traceStream: PrintStream? = null
-
+    fun genHMAC(data: ByteArray?, key: ByteArray?): ByteArray {
+        val result: ByteArray? = null
+        //根据给定的字节数组构造一个密钥,第二参数指定一个密钥算法的名称
+        val signinKey = SecretKeySpec(key, "HmacSHA1")
+        //生成一个指定 Mac 算法 的 Mac 对象
+        var mac: Mac? = null
         try {
-            traceStream = PrintStream(FileOutputStream(traceFile), true)
-        } catch (e: FileNotFoundException) {
-            e.printStackTrace()
+            mac = Mac.getInstance("HmacSHA1")
+        } catch (e: NoSuchAlgorithmException) {
+            throw RuntimeException(e)
         }
-        emulator!!.traceCode(module!!.base+0x3900, module!!.base+0x3a54).setRedirect(traceStream)
-        emulator!!.attach().addBreakPoint(module!!.base + 0x3958)
-        //emulator!!.traceWrite(module!!.base+0x3a44, module!!.base +0x3a44+8).setRedirect(traceStream);
-
-
-        dobby.replace(functionAddress, object : ReplaceCallback() {
-            // 使用Dobby inline hook导出函数
-            override fun onCall(emulator: Emulator<*>?, context: HookContext, originFunction: Long): HookStatus {
-                arg1 = context.getPointerArg(0)
-                arg2 = context.getPointerArg(1)
-                arg3 = context.getPointerArg(2)
-
-                return HookStatus.RET(emulator, originFunction)
-            }
-
-            override fun postCall(emulator: Emulator<*>?, context: HookContext) {
-                //println("ss_encrypted_size.postCall ret=" + context.getIntArg(0))
-                println("HMAC-SHA1 ${arg1!!.getByteArray(0,20).toHexString()}")
-            }
-        }, true)
-
+        //用给定密钥初始化 Mac 对象
+        try {
+            mac.init(signinKey)
+        } catch (e: InvalidKeyException) {
+            throw RuntimeException(e)
+        }
+        //完成 Mac 操作
+        return mac.doFinal(data)
     }
 
-    fun dumpStrings(start: Long, end: Long,emulator: AndroidEmulator) {
-        val foundStrings: MutableSet<String> = HashSet()
+    fun sub_249C(result: IntArray) {
+        var v5: Int // w14
+        var v6: Int // w1
+        val v7: Int // w15
+        var v9: Int // w16
+        var v11: Int // w4
+        var v12: Int // w6
+        var v13: Int // w5
+        var v14: Int // w20
+        val v15: Int // w4
+        var v16: Int // w17
+        val v17: Int // w19
+        val v18: Int // w9
+        var v20: Int // w2
+        val v22: Int // w4
+        val v25: Int // w17
+        var v26: Boolean // zf
+        val v27: Int // w13
+        var v28: Int // w15
+        val v29: Int // w4
+        val v30: Int // w10
+        var v31: Int // w11
+        val v34: Int // w13
+        val v35: Int // w10
+        val v39: Int // w9
+        var v40: Int // w13
+        var v42: Int // w8
 
-        // 读取内存中的所有块
-        var address = start
-        while (address < end) {
-            // 假设页面大小为0x1000
-            try {
-                val data: ByteArray = emulator.backend.mem_read(address, 0x1000)
-                val blockString = String(data, StandardCharsets.UTF_8)
-
-                // 使用正则表达式提取可打印字符串
-                val strings = blockString.split("[^\\p{Print}]+".toRegex()).dropLastWhile { it.isEmpty() }
-                    .toTypedArray()
-                for (str in strings) {
-                    if (str.length > 3) { // 过滤掉短的字符串
-                        foundStrings.add(str)
-                    }
-                }
-            } catch (e: Exception) {
-                // 忽略不可读的内存块
-            }
-            address += 0x1000
-        }
-
-        // 打印找到的所有字符串
-        foundStrings.forEach(Consumer { x: String? -> println(x) })
-    }
-
-    override fun callObjectMethod(
-        vm: BaseVM?,
-        dvmObject: DvmObject<*>?,
-        signature: String?,
-        varArg: VarArg?
-    ): DvmObject<*> {
-        if (signature == "android/content/Context->getPackageName()Ljava/lang/String;") {
-            return (StringObject(vm!!, "com.max.xiaoheihe"))
-        }
-
-        if (signature == "android/content/pm/PackageInfo->signatures:[Landroid/content/pm/Signature;") {
-            return (StringObject(vm!!, ""))
-        }
-        return super.callObjectMethod(vm, dvmObject, signature, varArg)
-    }
-
-    override fun getObjectField(vm: BaseVM?, dvmObject: DvmObject<*>?, signature: String?): DvmObject<*> {
-        if (signature == "android/content/pm/PackageInfo->signatures:[Landroid/content/pm/Signature;") {
-            var signature1 = Signature(vm!!,null)
-            return ArrayObject(signature1)
-        }
-        return super.getObjectField(vm, dvmObject, signature)
-    }
-
-    override fun callIntMethod(vm: BaseVM?, dvmObject: DvmObject<*>?, signature: String?, varArg: VarArg?): Int {
-        if (signature == "android/content/pm/Signature->hashCode()I") {
-            return 67780190
-        }
-        return super.callIntMethod(vm, dvmObject, signature, varArg)
+        val v1 = result[0] // w9
+        val v2 = result[1] // w10
+        val v3 = result[2] // w11
+        val v4 = result[3] // w13
+        v5 = 2 * v4
+        v6 = 2 * v2
+        v7 = (2 * v4) and 0xFE xor 0x1B
+        val v8 = if ((result[0] and 0x80) != 0) 2 * result[0] and 0xFE xor 0x1B
+        else 2 * result[0] // w3
+        v9 = (2 * v8) and 0xFE xor 0x1B
+        if ((v8 and 0x80) == 0) v9 = 2 * v8
+        val v10 = v9 xor v8 // w12
+        v11 = 2 * (v9 xor v8)
+        if (((v9 xor v8) and 0x80) != 0) v11 = ((2 * (v9 xor v8)) and 0xff) xor 0x1B
+        v12 = 2 * v11
+        if ((v11 and 0x80) != 0) v12 = (2 * v11) and 0xFE xor 0x1B
+        if ((v2 and 0x80) != 0) v6 = ((2 * v2) and 0xff) xor 0x1B
+        v13 = 2 * v6
+        if ((v6 and 0x80) != 0) v13 = (2 * v6) and 0xFE xor 0x1B
+        v14 = 2 * (v13 xor v6)
+        if (((v13 xor v6) and 0x80) != 0) v14 = ((2 * (v13 xor v6)) and 0xff) xor 0x1B
+        v15 = v11 xor v4
+        v16 = 2 * v3
+        v17 = v15 xor v1
+        v18 = v14 xor v1 xor v2 xor v8
+        val v19 = if ((v14 and 0x80) != 0) 2 * v14 and 0xFE xor 0x1B
+        else 2 * v14 // w3
+        if ((v3 and 0x80) != 0) v16 = (2 * v3) and 0xFE xor 0x1B
+        v20 = 2 * v16
+        val v21 = v18 xor v13 // w9
+        if ((v16 and 0x80) != 0) v20 = (2 * v16) and 0xFE xor 0x1B
+        v22 = v15 xor v3
+        val v23 = v20 xor v16 // w13
+        if ((result[3] and 0x80) != 0) v5 = v7
+        val v24 = v22 xor v16 // w4
+        v25 = 2 * v23
+        v26 = (v23 and 0x80) == 0
+        v27 = v17 xor v5 xor v9 xor v23
+        v28 = v25 and 0xFE xor 0x1B
+        if (v26) v28 = v25
+        v29 = v24 xor v13 xor v6
+        v30 = v28 xor v2 xor v3
+        v31 = (2 * v28) and 0xFE xor 0x1B
+        val v32 = v27 xor v14 xor v12 // w13
+        val v33 = v30 xor v6 // w10
+        if ((v28 and 0x80) == 0) v31 = 2 * v28
+        v34 = v32 xor v19
+        v35 = v33 xor v10
+        val v36 = if ((v5 and 0x80) != 0) 2 * v5 and 0xff xor 0x1B
+        else 2 * v5 // w12
+        result[0] = v34
+        val v37 = v36 xor v5 // w13
+        val v38 = 2 * (v36 xor v5) // w14
+        v39 = v21 xor v37
+        v26 = (v37 and 0x80) == 0
+        v40 = v38 and 0xFE xor 0x1B
+        val v41 = v39 xor v28 xor v19 // w9
+        if (v26) v40 = v38
+        result[1] = v41 xor v31
+        v42 = (2 * v40) and 0xFE xor 0x1B
+        val v43 = v35 xor v20 xor v40 xor v31 // w10
+        if ((v40 and 0x80) == 0) v42 = 2 * v40
+        result[2] = v43 xor v42
+        result[3] = v29 xor v36 xor v40 xor v12 xor v42
     }
 }
