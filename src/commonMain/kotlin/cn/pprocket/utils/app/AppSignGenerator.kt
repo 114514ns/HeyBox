@@ -1,19 +1,19 @@
 package org.example.cn.pprocket.utils.app
 
 
-import java.nio.ByteBuffer
-import java.security.InvalidKeyException
-import java.security.NoSuchAlgorithmException
-import java.util.*
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
+import io.ktor.util.*
+import io.ktor.utils.io.core.*
+import kotlin.experimental.xor
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 
 object AppSignGenerator {
 
+    @OptIn(ExperimentalEncodingApi::class)
     fun hkey(path: String, time: String, nonce: String): String {
-        val base64 = Base64.getEncoder().encodeToString(path.toByteArray())
-        val result = CharArray(7)
+        val base64 = Base64.encode(path.toByteArray())
+        val result = CharArray(5)
         //HeyBox heyBox = new HeyBox();
         //heyBox.init();
         var timeNum = time.toLong()
@@ -28,7 +28,7 @@ object AppSignGenerator {
         val v16 = Char((timeNum shr 16).toUShort())
         val v8 = Char((timeNum shr 8).toUShort())
         val bytes = ByteArray(8)
-        val v77 = ("23456789BCDFGHJKMNPQRTVWXY" + nonce.uppercase(Locale.getDefault())).toByteArray()
+        val v77 = ("23456789BCDFGHJKMNPQRTVWXY" + nonce.uppercase().toByteArray())
 
         bytes[0] = 0.toByte()
         bytes[1] = 0
@@ -69,16 +69,17 @@ object AppSignGenerator {
         array[3] = result[4].code
         sub_249C(array)
         val v43 = (array[0] + array[1] + array[2] + array[3]) % 100
-        val num = v43.toString().toByteArray()
-        result[6] = Char(num[1].toUShort())
-        if (v43 < 10) {
-            result[5] = 0.toChar()
-        } else {
-            result[5] = Char(num[0].toUShort())
-        }
-        return String(result)
+        val num = formatWithLeadingZeros(v43)
+        return result.concatToString() + num
     }
-
+    fun formatWithLeadingZeros(value: Int, minLength: Int = 2): String {
+        val stringValue = value.toString()
+        return if (stringValue.length >= minLength) {
+            stringValue
+        } else {
+            "0".repeat(minLength - stringValue.length) + stringValue
+        }
+    }
 
     fun bswap32(x: Int): Int {
         return ((x shl 24) and -0x1000000) or
@@ -87,13 +88,16 @@ object AppSignGenerator {
                 ((x shr 24) and 0x000000ff)
     }
 
-    fun byteArrayToLong(bytes: ByteArray?): Int {
-        val buffer = ByteBuffer.wrap(bytes)
-        // 如果需要小端序，使用：buffer.order(ByteOrder.LITTLE_ENDIAN);
-        return buffer.getInt()
+
+    fun byteArrayToLong(bytes: ByteArray): Int {
+        return (bytes[0].toInt() and 0xFF shl 24) or
+                (bytes[1].toInt() and 0xFF shl 16) or
+                (bytes[2].toInt() and 0xFF shl 8) or
+                (bytes[3].toInt() and 0xFF)
     }
 
 
+    /*
     fun genHMAC(data: ByteArray?, key: ByteArray?): ByteArray {
         val result: ByteArray? = null
         //根据给定的字节数组构造一个密钥,第二参数指定一个密钥算法的名称
@@ -113,6 +117,27 @@ object AppSignGenerator {
         }
         //完成 Mac 操作
         return mac.doFinal(data)
+    }
+
+     */
+    fun genHMAC(data: ByteArray, key: ByteArray): ByteArray {
+        val blockSize = 64  // SHA-1 block size in bytes
+
+        // Step 1: Pad the key to the block size
+        val actualKey = if (key.size > blockSize) sha1(key) else key
+        val paddedKey = actualKey.copyOf(blockSize)
+
+        // Step 2: Create inner and outer padded keys
+        val innerKeyPad = ByteArray(blockSize) { i -> (paddedKey[i] xor 0x36).toByte() }
+        val outerKeyPad = ByteArray(blockSize) { i -> (paddedKey[i] xor 0x5C).toByte() }
+
+        // Step 3: Compute the inner hash
+        val innerHashInput = innerKeyPad + data
+        val innerHash = sha1(innerHashInput)
+
+        // Step 4: Compute the outer hash
+        val outerHashInput = outerKeyPad + innerHash
+        return sha1(outerHashInput)
     }
 
     fun sub_249C(result: IntArray) {

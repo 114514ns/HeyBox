@@ -1,22 +1,22 @@
-package org.example.cn.pprocket.utils.app
+package cn.pprocket.utils.app
 
-import cn.pprocket.utils.SignGenerator
-import cn.pprocket.utils.app.SignPool
-import java.util.*
+import cn.pprocket.Platform
+import org.example.cn.pprocket.utils.app.AppSignGenerator
+import kotlin.random.Random
 
 class AppParamsBuilder(private val maps: Map<String, String>) {
     @OptIn(ExperimentalStdlibApi::class)
     fun nonce(): String {
-        val random = Random()
-        val stringBuffer = StringBuffer()
+        val random = Random
+        val stringBuilder = StringBuilder()
         for (i2 in 0..31) {
-            stringBuffer.append("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"[random.nextInt(62)])
+            stringBuilder.append("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"[random.nextInt(62)])
         }
-        return stringBuffer.toString()
+        return stringBuilder.toString()
     }
 
     fun build(path:String): String {
-        var time = (System.currentTimeMillis() / 1000).toString()
+        var time = (Platform.currentTimeMillis() / 1000).toString()
         //val time = "1721618176"
         val hash = nonce()
         //val hash = "mcfuUBmVtL9fXAFIXoQsOLBYNOFFuzCt"
