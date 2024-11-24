@@ -5,14 +5,11 @@ import cn.pprocket.utils.Encrypt
 import cn.pprocket.utils.ParamsBuilder
 import cn.pprocket.utils.app.AppParamsBuilder
 import com.fleeksoft.ksoup.Ksoup
-import io.ktor.client.*
 import io.ktor.client.plugins.api.*
-import io.ktor.client.plugins.cookies.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.util.*
 import io.ktor.utils.io.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
@@ -24,6 +21,7 @@ object HeyClient : Client {
     var cookie: String = ""
     var scriptContent = ""
     var user = User()
+    var domain = "https://api.xiaoheihe.cn"
     var ktorClient = Platform.getKtorClient()
     override suspend fun login(cookie: String) {
         this.cookie = cookie
@@ -35,7 +33,7 @@ object HeyClient : Client {
             "userid" to heyId,
         )
         val str =
-            get("https://api.xiaoheihe.cn/bbs/app/profile/user/profile?${ParamsBuilder(params).build("/bbs/app/profile/user/profile/")}")
+            get("${domain}/bbs/app/profile/user/profile?${ParamsBuilder(params).build("/bbs/app/profile/user/profile/")}")
         val obj = Json.decodeFromString<JsonObject>(str)["account_detail"]!!.jsonObject
         user.userName = obj.get("username")!!.jsonPrimitive.content
         user.avatar = obj.get("avatar")!!.jsonPrimitive.content
@@ -58,7 +56,7 @@ object HeyClient : Client {
             "offset" to ((page - 1) * 20).toString(),
         )
         val url =
-            "https://api.xiaoheihe.cn/bbs/web/profile/post/comments?${ParamsBuilder(params).build("/bbs/web/profile/post/comments/")}"
+            "${domain}/bbs/web/profile/post/comments?${ParamsBuilder(params).build("/bbs/web/profile/post/comments/")}"
         val res = get(url)
         val comments = mutableListOf<Comment>()
         Json.decodeFromString<JsonObject>(res)["result"]!!.jsonArray.forEach {
@@ -98,7 +96,7 @@ object HeyClient : Client {
             "post_type" to "1",
         )
         val url =
-            "https://api.xiaoheihe.cn/bbs/web/profile/post/links?${ParamsBuilder(params).build("/bbs/web/profile/post/links/")}"
+            "${domain}/bbs/web/profile/post/links?${ParamsBuilder(params).build("/bbs/web/profile/post/links/")}"
         val res = get(url)
         val posts = mutableListOf<Post>()
         Json.decodeFromString<JsonObject>(res)["post_links"]!!.jsonArray.forEach {
@@ -114,7 +112,7 @@ object HeyClient : Client {
             "page" to "1",
             "limit" to "10"
         )
-        val url = "https://api.xiaoheihe.cn/bbs/app/link/tree?${ParamsBuilder(params).build("/bbs/app/link/tree/")}"
+        val url = "${domain}/bbs/app/link/tree?${ParamsBuilder(params).build("/bbs/app/link/tree/")}"
         val res = get(url)
         val obj = Json.decodeFromString<JsonObject>(res).jsonObject.get("link")!!.jsonObject
         val builder = StringBuilder()
@@ -133,7 +131,7 @@ object HeyClient : Client {
             "return_json" to "1",
             "index" to "1"
         )
-        val url = "https://api.xiaoheihe.cn/bbs/app/link/web/view?${ParamsBuilder(params).build("/bbs/app/link/web/view/")}"
+        val url = "${domain}/bbs/app/link/web/view?${ParamsBuilder(params).build("/bbs/app/link/web/view/")}"
         val str = get(url)
         val obj = Json.decodeFromString<JsonObject>(str).jsonObject.get("link")!!.jsonObject
         val raw = obj["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content
@@ -188,7 +186,7 @@ object HeyClient : Client {
                 "sort_filter" to "hot-rank"
             )
             val url =
-                "https://api.xiaoheihe.cn/bbs/app/topic/feeds?${ParamsBuilder(map).build("/bbs/app/topic/feeds/")}"
+                "${domain}/bbs/app/topic/feeds?${ParamsBuilder(map).build("/bbs/app/topic/feeds/")}"
             res = get(url)
         } else if (topic.id == -1) {
             val params = mapOf(
@@ -201,7 +199,7 @@ object HeyClient : Client {
                 "news_list_group" to "control-group",
             )
             val url =
-                "https://api.xiaoheihe.cn/bbs/app/feeds/news?${ParamsBuilder(params).build("/bbs/app/feeds/news/")}"
+                "${domain}/bbs/app/feeds/news?${ParamsBuilder(params).build("/bbs/app/feeds/news/")}"
             res = get(url)
         } else {
             val params = mapOf(
@@ -210,7 +208,7 @@ object HeyClient : Client {
                 "last_pull" to "1",
                 "is_first" to "0"
             )
-            val url = "https://api.xiaoheihe.cn/bbs/app/feeds?${AppParamsBuilder(params).build("/bbs/app/feeds/")}"
+            val url = "${domain}/bbs/app/feeds?${AppParamsBuilder(params).build("/bbs/app/feeds/")}"
 
             res = get(url)
         }
@@ -299,7 +297,7 @@ object HeyClient : Client {
             "limit" to "10"
         )
         val url =
-            "https://api.xiaoheihe.cn/bbs/app/link/tree/?${ParamsBuilder(params).build("/bbs/app/link/tree/")}"
+            "${domain}/bbs/app/link/tree/?${ParamsBuilder(params).build("/bbs/app/link/tree/")}"
         val res = get(url)
         val post = parsePost(Json.decodeFromString<JsonObject>(res)["link"]!!.jsonObject)
         return post
@@ -321,7 +319,7 @@ object HeyClient : Client {
             "sort_filter" to "hot",
         )
         val url =
-            "https://api.xiaoheihe.cn/bbs/app/link/tree?${ParamsBuilder(map).build("/bbs/app/link/tree/")}"
+            "${domain}/bbs/app/link/tree?${ParamsBuilder(map).build("/bbs/app/link/tree/")}"
         val str = get(url)
         Json.decodeFromString<JsonObject>(str).get("comments")!!.jsonArray.forEach {
             var isFirst = true
@@ -356,7 +354,7 @@ object HeyClient : Client {
         img = if (img.isEmpty()) "" else img.substring(0, img.length - 1)
         val params = mapOf<String, String>()
         val url =
-            "https://api.xiaoheihe.cn/bbs/app/comment/create?${ParamsBuilder(params).build("/bbs/app/comment/create/")}"
+            "${domain}/bbs/app/comment/create?${ParamsBuilder(params).build("/bbs/app/comment/create/")}"
 
 
             val res = ktorClient.submitForm(
@@ -376,7 +374,7 @@ object HeyClient : Client {
     override suspend fun genQRCode(): String {
         val params = mapOf<String, String>()
         val url =
-            "https://api.xiaoheihe.cn/account/get_qrcode_url?${ParamsBuilder(params).build("/account/get_qrcode_url/")}"
+            "${domain}/account/get_qrcode_url?${ParamsBuilder(params).build("/account/get_qrcode_url/")}"
         val str = get(url)
         return Json.decodeFromString<JsonObject>(str)["qr_url"]!!.jsonPrimitive.content
     }
@@ -498,7 +496,7 @@ object HeyClient : Client {
             "qr" to uuid,
             "web_source" to "open"
         )
-        val url = "https://api.xiaoheihe.cn/account/qr_state?${ParamsBuilder(params).build("/account/qr_state/")}"
+        val url = "${domain}/account/qr_state?${ParamsBuilder(params).build("/account/qr_state/")}"
         val str = get(url)
         if (str.contains("登录成功")) {
             var jsonObject = Json.decodeFromString<JsonObject>(str)
@@ -514,7 +512,7 @@ object HeyClient : Client {
         /*
         val params = mapOf<String, String>()
         val url =
-            "https://api.xiaoheihe.cn/bbs/app/comment/support?${ParamsBuilder(params).build("/bbs/app/comment/support/")}"
+            "${domain}/bbs/app/comment/support?${ParamsBuilder(params).build("/bbs/app/comment/support/")}"
         runBlocking {
             ktorClient.submitForm(
                 url,
@@ -535,7 +533,7 @@ object HeyClient : Client {
             "offset" to "${(page - 1) * 30}"
         )
         val url =
-            "https://api.xiaoheihe.cn/bbs/app/profile/following/list?${ParamsBuilder(params).build("/bbs/app/profile/following/list/")}"
+            "${domain}/bbs/app/profile/following/list?${ParamsBuilder(params).build("/bbs/app/profile/following/list/")}"
         val str = get(url)
         val json = Json.decodeFromString<JsonObject>(str)
         val list = mutableListOf<User>()
@@ -558,7 +556,7 @@ object HeyClient : Client {
             "offset" to "${(page - 1) * 30}"
         )
         val url =
-            "https://api.xiaoheihe.cn/bbs/app/profile/follower/list?${ParamsBuilder(params).build("/bbs/app/profile/follower/list/")}"
+            "${domain}/bbs/app/profile/follower/list?${ParamsBuilder(params).build("/bbs/app/profile/follower/list/")}"
         val str = get(url)
         val json = Json.decodeFromString<JsonObject>(str)
         val list = mutableListOf<User>()
@@ -600,7 +598,7 @@ object HeyClient : Client {
         )
         val list = mutableListOf<String>()
         val url =
-            "https://api.xiaoheihe.cn/bbs/app/api/search/suggestion/v2?${ParamsBuilder(params).build("/bbs/app/api/search/suggestion/v2/")}"
+            "${domain}/bbs/app/api/search/suggestion/v2?${ParamsBuilder(params).build("/bbs/app/api/search/suggestion/v2/")}"
         val str = get(url)
         val obj = Json.decodeFromString<JsonObject>(str)
         obj["suggestions"]!!.jsonArray.forEach {
@@ -620,7 +618,7 @@ object HeyClient : Client {
         )
         val list = mutableListOf<Post>()
         val url =
-            "https://api.xiaoheihe.cn/bbs/app/api/general/search/v1?${ParamsBuilder(params).build("/bbs/app/api/general/search/v1/")}"
+            "${domain}/bbs/app/api/general/search/v1?${ParamsBuilder(params).build("/bbs/app/api/general/search/v1/")}"
         val str = get(url)
         Json.decodeFromString<JsonObject>(str)["items"]!!.jsonArray.forEach {
             if (it.jsonObject.get("type")!!.jsonPrimitive.content == "link") {
@@ -639,7 +637,7 @@ object HeyClient : Client {
             "is_first" to "0",
 
             )
-        val url = "https://api.xiaoheihe.cn/bbs/app/feeds?${ParamsBuilder(params).build("/bbs/app/feeds/")}"
+        val url = "${domain}/bbs/app/feeds?${ParamsBuilder(params).build("/bbs/app/feeds/")}"
         val str = get(url)
         println(str)
     }

@@ -1,19 +1,18 @@
 package cn.pprocket.utils
 
-import java.security.MessageDigest
-import java.util.*
+import cn.pprocket.Platform
+import io.ktor.utils.io.core.*
+import korlibs.crypto.MD5
+import kotlin.random.Random
 
 
 class ParamsBuilder(private val maps: Map<String, String>) {
     @OptIn(ExperimentalStdlibApi::class)
     private fun nonce(): String {
-        val random = Random().nextDouble()
-        var instance = MessageDigest.getInstance("MD5")
-        instance.update(random.toString().toByteArray())
-        return instance.digest().toHexString(HexFormat.UpperCase)
+        return MD5.digest(Random.nextDouble().toString().toByteArray()).hex
     }
     fun build(path:String): String {
-        var time = (System.currentTimeMillis() / 1000).toString()
+        var time = (Platform.currentTimeMillis() / 1000).toString()
         val hash = nonce()
         val builtin = mapOf(
             "client_type" to "heybox_chat",

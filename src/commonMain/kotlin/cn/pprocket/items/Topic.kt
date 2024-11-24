@@ -1,5 +1,6 @@
 package cn.pprocket.items
 
+import cn.pprocket.HeyClient.domain
 import cn.pprocket.HeyClient.get
 import cn.pprocket.utils.ParamsBuilder
 import kotlinx.serialization.json.*
@@ -30,7 +31,7 @@ data class Topic(
             params["is_post"] = "1"
             params["post_tab"] = "1"
             val url =
-                "https://api.xiaoheihe.cn/bbs/app/api/topic/index?" + ParamsBuilder(params).build("/bbs/app/api/topic/index/")
+                "${domain}/bbs/app/api/topic/index?" + ParamsBuilder(params).build("/bbs/app/api/topic/index/")
             val string = get(url)
             val topics = mutableListOf<Topic>()
             Json.decodeFromString<JsonObject>(string).get("topics_list")!!.jsonArray.forEach {

@@ -28,7 +28,7 @@ object AppSignGenerator {
         val v16 = Char((timeNum shr 16).toUShort())
         val v8 = Char((timeNum shr 8).toUShort())
         val bytes = ByteArray(8)
-        val v77 = ("23456789BCDFGHJKMNPQRTVWXY" + nonce.uppercase().toByteArray())
+        val v77 = ("23456789BCDFGHJKMNPQRTVWXY" + nonce.uppercase())
 
         bytes[0] = 0.toByte()
         bytes[1] = 0
@@ -97,29 +97,6 @@ object AppSignGenerator {
     }
 
 
-    /*
-    fun genHMAC(data: ByteArray?, key: ByteArray?): ByteArray {
-        val result: ByteArray? = null
-        //根据给定的字节数组构造一个密钥,第二参数指定一个密钥算法的名称
-        val signinKey = SecretKeySpec(key, "HmacSHA1")
-        //生成一个指定 Mac 算法 的 Mac 对象
-        var mac: Mac? = null
-        try {
-            mac = Mac.getInstance("HmacSHA1")
-        } catch (e: NoSuchAlgorithmException) {
-            throw RuntimeException(e)
-        }
-        //用给定密钥初始化 Mac 对象
-        try {
-            mac.init(signinKey)
-        } catch (e: InvalidKeyException) {
-            throw RuntimeException(e)
-        }
-        //完成 Mac 操作
-        return mac.doFinal(data)
-    }
-
-     */
     fun genHMAC(data: ByteArray, key: ByteArray): ByteArray {
         val blockSize = 64  // SHA-1 block size in bytes
 

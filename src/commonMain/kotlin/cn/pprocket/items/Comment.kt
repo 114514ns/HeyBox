@@ -1,10 +1,10 @@
 package cn.pprocket.items
 
+import cn.pprocket.HeyClient.domain
 import cn.pprocket.HeyClient.get
 import cn.pprocket.HeyClient.parseComment
 import cn.pprocket.utils.ParamsBuilder
 import kotlinx.serialization.json.*
-
 
 class Comment {
     var content: String = ""
@@ -31,7 +31,7 @@ class Comment {
             "lastval" to subComments!![subComments!!.size - 1].commentId!!
         )
         val url =
-            "https://api.xiaoheihe.cn/bbs/app/comment/sub/comments?" + ParamsBuilder(params).build("/bbs/app/comment/sub/comments/")
+            "${domain}/bbs/app/comment/sub/comments?" + ParamsBuilder(params).build("/bbs/app/comment/sub/comments/")
         val string = get(url)
         val array = Json.decodeFromString<JsonObject>(string)["comments"]!!.jsonArray
         array.forEach {
