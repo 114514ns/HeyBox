@@ -3,8 +3,8 @@ plugins {
     id("maven-publish")
 }
 repositories {
-    mavenCentral()
     mavenLocal()
+    mavenCentral()
 }
 kotlin {
     jvm()
@@ -17,7 +17,7 @@ kotlin {
         val ktor_version = "3.0.0-beta-2"
         val commonMain by getting {
             dependencies {
-                implementation("cn.pprocket:heybase:20241025-1")
+                compileOnly("cn.pprocket:HeyBase:241207-7")
                 implementation("io.ktor:ktor-client-core:3.0.0-beta-2")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("com.fleeksoft.ksoup:ksoup:0.1.8")
@@ -41,7 +41,7 @@ kotlin {
     }
 }
 group = "cn.pprocket"
-version = "241123-1"
+version = "241207-4"
 
 
 publishing {

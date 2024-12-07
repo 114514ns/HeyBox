@@ -49,7 +49,7 @@ object HeyClient : Client {
         return user
     }
 
-    suspend fun User.fetchComments(page: Int): List<Comment> {
+    override suspend fun User.fetchComments(page: Int): List<Comment> {
         val params = mapOf(
             "userid" to this.userId,
             "limit" to "20",
@@ -63,7 +63,8 @@ object HeyClient : Client {
             var obj = it.jsonObject
             val comment = Comment()
             comment.commentId = obj.get("comment_id")!!.jsonPrimitive.content
-            comment.createdAt = parseTime(obj.get("create_at")!!.jsonPrimitive.content.replace(".0", "").toLong() * 1000)
+            comment.createdAt =
+                parseTime(obj.get("create_at")!!.jsonPrimitive.content.replace(".0", "").toLong() * 1000)
             comment.content = obj.get("text")!!.jsonPrimitive.content
             comment.replyId = try {
                 obj.get("root_comment_id")!!.jsonPrimitive.content
@@ -88,7 +89,7 @@ object HeyClient : Client {
         return comments
     }
 
-    suspend fun User.fetchPosts(page: Int): List<Post> {
+    override suspend fun User.fetchPosts(page: Int): List<Post> {
         val params = mapOf(
             "userid" to this.userId.toString(),
             "limit" to "20",
@@ -106,25 +107,30 @@ object HeyClient : Client {
         }
         return posts
     }
-    suspend fun Post.fillContent() : String {
+
+
+    override suspend fun Comment.fillSubComments():List<Comment> {
+        if (!hasMore) return subComments
         val params = mapOf(
-            "link_id" to this.postId,
-            "page" to "1",
-            "limit" to "10"
+            "root_comment_id" to commentId!!,
+            "lastval" to subComments!![subComments!!.size - 1].commentId!!
         )
-        val url = "${domain}/bbs/app/link/tree?${ParamsBuilder(params).build("/bbs/app/link/tree/")}"
-        val res = get(url)
-        val obj = Json.decodeFromString<JsonObject>(res).jsonObject.get("link")!!.jsonObject
-        val builder = StringBuilder()
-        Json.decodeFromString<JsonArray>(obj.get("text")!!.jsonPrimitive.content).jsonArray.forEach {
-            val obj = it.jsonObject
-            if (obj["type"]!!.jsonPrimitive.content == "text") {
-                builder.append(obj.get("text")!!.jsonPrimitive.content).append("\n")
-            }
+        val url =
+            "${domain}/bbs/app/comment/sub/comments?" + ParamsBuilder(params).build("/bbs/app/comment/sub/comments/")
+        val string = get(url)
+        val array = Json.decodeFromString<JsonObject>(string)["comments"]!!.jsonArray
+        array.forEach {
+            val comment = parseComment(it.jsonObject)
+            subComments!!.add(comment)
         }
-        return builder.toString()
+        hasMore = Json.decodeFromString<JsonObject>(string)["has_more"]!!.jsonPrimitive.boolean
+        this.subComments.distinctBy { it.commentId }
+        subComments!!.forEach { ele: Comment -> ele.postId = postId }
+
+        return this.subComments
     }
-    suspend fun Post.renderHTML() :List<Tag> {
+
+    override suspend fun Post.renderHTML(): List<Tag> {
         val tags = mutableListOf<Tag>()
         val params = mapOf(
             "link_id" to this.postId,
@@ -146,7 +152,7 @@ object HeyClient : Client {
                     tag.tagType = "title"
                     tag.tagValue = ele.text()
                 } else if (!ele.getElementsByTag("img").isEmpty()) {
-                    val img  = ele.getElementsByTag("img")[0]
+                    val img = ele.getElementsByTag("img")[0]
                     if (img.hasAttr("data-original")) {
                         tag.tagType = "image"
                         tag.tagValue = img.attr("data-original")
@@ -227,7 +233,7 @@ object HeyClient : Client {
         return posts
     }
 
-    fun parsePost(obj: JsonObject):Post {
+    fun parsePost(obj: JsonObject): Post {
         val post = Post()
         if (!obj.containsKey("linkid")) {
             return post
@@ -309,6 +315,10 @@ object HeyClient : Client {
         return game
     }
 
+    override suspend fun getImageReferer(): String {
+        return "https://xiaoheihe.cn"
+    }
+
 
     override suspend fun getComments(postId: String, page: Int): List<Comment> {
         val comments = mutableListOf<Comment>()
@@ -346,6 +356,21 @@ object HeyClient : Client {
         return comments
     }
 
+    override suspend fun getDefaultTopics(): List<Topic> {
+        return listOf(
+            Topic("盒友杂谈", 7214, ""),
+            Topic("情投一盒", 416158, ""),
+            Topic("校园生活", 549999, ""),
+            Topic("数码硬件", 18745, ""),
+            Topic(
+                "职场工作", 550000, ""
+            ),
+            Topic("热点", -1, ""),
+            Topic("推荐", -2, ""),
+            Topic("Max家", 475512, ""),
+        )
+    }
+
     override suspend fun reply(postId: String, text: String, rootId: String?, images: List<String>) {
         var img = ""
         images.forEach {
@@ -357,18 +382,18 @@ object HeyClient : Client {
             "${domain}/bbs/app/comment/create?${ParamsBuilder(params).build("/bbs/app/comment/create/")}"
 
 
-            val res = ktorClient.submitForm(
-                url,
-                parameters {
-                    append("link_id",postId)
-                    append("text",text)
-                    append("root_id",rootId ?: "-1")
-                    append("reply_id",rootId ?: "-1")
-                    append("imgs", img)
-                    append("is_cy", "0")
-                }
-            ).bodyAsText()
-            res
+        val res = ktorClient.submitForm(
+            url,
+            parameters {
+                append("link_id", postId)
+                append("text", text)
+                append("root_id", rootId ?: "-1")
+                append("reply_id", rootId ?: "-1")
+                append("imgs", img)
+                append("is_cy", "0")
+            }
+        ).bodyAsText()
+        res
     }
 
     override suspend fun genQRCode(): String {
@@ -430,9 +455,9 @@ object HeyClient : Client {
         val url =
             "https://chat.xiaoheihe.cn/chatroom/v2/common/cos/upload/token?${ParamsBuilder(params).build("/chatroom/v2/common/cos/upload/token/")}"
         var str = ktorClient.post(url) {
-                contentType(ContentType.Application.Json)
-                setBody(content)
-            }.bodyAsText()
+            contentType(ContentType.Application.Json)
+            setBody(content)
+        }.bodyAsText()
 
 
         val obj = Json.decodeFromString<JsonObject>(str)["result"]!!.jsonObject["info"]!!.jsonObject
@@ -466,15 +491,16 @@ object HeyClient : Client {
             "q-sign-algorithm=sha1&q-ak=${tmpSecretId}&q-sign-time=${startTime};${expiredTime}&q-key-time=${startTime};${expiredTime}&q-header-list=content-length;host&q-url-param-list=&q-signature=${sign}"
 
         //val res = cosClient.newCall(request.build()).execute().body!!.string()
-            ktorClient.put(path) {
-                body = byteArray
-                headers {
-                    append("Authorization",template)
-                    append("x-cos-security-token",sessionToken)
-                }
+        ktorClient.put(path) {
+            body = byteArray
+            headers {
+                append("Authorization", template)
+                append("x-cos-security-token", sessionToken)
+            }
         }
         return path
     }
+
     fun getPathFromUrl(url: String): String {
         // 找到第一个 '/' 的位置，跳过协议部分 (http:// or https://)
         val startIndex = url.indexOf("://")?.let { it + 3 } ?: 0
@@ -506,6 +532,48 @@ object HeyClient : Client {
             return true
         }
         return false
+    }
+
+    override suspend fun fetchTopics(): List<Topic> {
+        val params: MutableMap<String, String> = HashMap()
+        params["type"] = "list"
+        params["is_post"] = "1"
+        params["post_tab"] = "1"
+        val url =
+            "${domain}/bbs/app/api/topic/index?" + ParamsBuilder(params).build("/bbs/app/api/topic/index/")
+        val string = get(url)
+        val topics = mutableListOf<Topic>()
+        Json.decodeFromString<JsonObject>(string).get("topics_list")!!.jsonArray.forEach {
+            it.jsonObject.get("children")!!.jsonArray.forEach {
+                val o = it.jsonObject
+                val topic = Topic(
+                    id = o.get("topic_id")!!.jsonPrimitive.int,
+                    name = o.get("name")!!.jsonPrimitive.content,
+                    icon = o.get("pic_url")!!.jsonPrimitive.content
+                )
+                topics.add(topic)
+            }
+        }
+        return topics
+    }
+
+    override suspend fun fillContent(obj: Post): String {
+        val params = mapOf(
+            "link_id" to obj.postId,
+            "page" to "1",
+            "limit" to "10"
+        )
+        val url = "${domain}/bbs/app/link/tree?${ParamsBuilder(params).build("/bbs/app/link/tree/")}"
+        val res = get(url)
+        val obj = Json.decodeFromString<JsonObject>(res).jsonObject.get("link")!!.jsonObject
+        val builder = StringBuilder()
+        Json.decodeFromString<JsonArray>(obj.get("text")!!.jsonPrimitive.content).jsonArray.forEach {
+            val obj = it.jsonObject
+            if (obj["type"]!!.jsonPrimitive.content == "text") {
+                builder.append(obj.get("text")!!.jsonPrimitive.content).append("\n")
+            }
+        }
+        return builder.toString()
     }
 
     override suspend fun like(commentId: String) {
@@ -582,17 +650,17 @@ object HeyClient : Client {
         }
 
          */
-            string = ktorClient.get(url).bodyAsText()
-            var obj = Json.decodeFromString<JsonObject>(string)
-            modifiedResponseString = obj.toString()
-            if (obj.contains("result") && obj.get("result") is JsonObject) {
-                modifiedResponseString = obj.get("result").toString()
-            }
+        string = ktorClient.get(url).bodyAsText()
+        var obj = Json.decodeFromString<JsonObject>(string)
+        modifiedResponseString = obj.toString()
+        if (obj.contains("result") && obj.get("result") is JsonObject) {
+            modifiedResponseString = obj.get("result").toString()
+        }
         return modifiedResponseString
     }
 
 
-    suspend fun searchSuggestion(keyword: String): List<String> {
+    override suspend fun searchSuggestion(keyword: String): List<String> {
         val params = mapOf(
             "q" to keyword,
         )
@@ -607,7 +675,7 @@ object HeyClient : Client {
         return list
     }
 
-    suspend fun searchPost(key: String, page: Int): List<Post> {
+    override suspend fun searchPost(key: String, page: Int): List<Post> {
         val params = mapOf(
             "q" to key,
             "search_type" to "link",
