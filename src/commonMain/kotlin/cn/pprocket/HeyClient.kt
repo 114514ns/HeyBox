@@ -567,11 +567,16 @@ object HeyClient : Client {
         val res = get(url)
         val obj = Json.decodeFromString<JsonObject>(res).jsonObject.get("link")!!.jsonObject
         val builder = StringBuilder()
-        Json.decodeFromString<JsonArray>(obj.get("text")!!.jsonPrimitive.content).jsonArray.forEach {
-            val obj = it.jsonObject
-            if (obj["type"]!!.jsonPrimitive.content == "text") {
-                builder.append(obj.get("text")!!.jsonPrimitive.content).append("\n")
+
+        try {
+            Json.decodeFromString<JsonArray>(obj.get("text")!!.jsonPrimitive.content).jsonArray.forEach {
+                val obj = it.jsonObject
+                if (obj["type"]!!.jsonPrimitive.content == "text") {
+                    builder.append(obj.get("text")!!.jsonPrimitive.content).append("\n")
+                }
             }
+        } catch (e: Exception) {
+            builder.append(obj.get("description"))
         }
         return builder.toString()
     }
