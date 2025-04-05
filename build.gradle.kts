@@ -1,5 +1,5 @@
 plugins {
-    kotlin("multiplatform") version "2.0.20"
+    kotlin("multiplatform") version "2.1.10"
     id("maven-publish")
 }
 repositories {
@@ -17,7 +17,7 @@ kotlin {
         val ktor_version = "3.0.0-beta-2"
         val commonMain by getting {
             dependencies {
-                compileOnly("cn.pprocket:HeyBase:241212-1")
+                implementation("cn.pprocket:HeyBase:250202-2")
                 implementation("io.ktor:ktor-client-core:3.0.0-beta-2")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("com.fleeksoft.ksoup:ksoup:0.1.8")
@@ -41,7 +41,7 @@ kotlin {
     }
 }
 group = "cn.pprocket"
-version = "241215-2"
+version = "250203-1"
 
 
 publishing {

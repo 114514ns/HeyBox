@@ -27,6 +27,60 @@ object HeyClient : Client {
         this.cookie = cookie
     }
 
+    override suspend fun onEnable() {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun renderHTML(id: String): List<Element> {
+        val tags = mutableListOf<Element>()
+        val params = mapOf(
+            "link_id" to id,
+            "return_json" to "1",
+            "index" to "1"
+        )
+        val url = "${domain}/bbs/app/link/web/view?${ParamsBuilder(params).build("/bbs/app/link/web/view/")}"
+        val str = get(url)
+        val obj = Json.decodeFromString<JsonObject>(str).jsonObject.get("link")!!.jsonObject
+        val raw = obj["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content
+        val elements = Ksoup.parse(raw).getElementsByTag("body")[0].children()
+        elements.forEach {
+            var ele = it
+            val tag = Element()
+            if (ele.childNodes().size != 0) {
+                if (!ele.getElementsByTag("h3").isEmpty() ||
+                    !ele.getElementsByTag("h2").isEmpty()
+                ) {
+                    tag.tagType = "title"
+                    tag.tagValue = ele.text()
+                } else if (!ele.getElementsByTag("img").isEmpty()) {
+                    val img = ele.getElementsByTag("img")[0]
+                    if (img.hasAttr("data-original")) {
+                        tag.tagType = "image"
+                        tag.tagValue = img.attr("data-original")
+                    } else {
+                        tag.tagType = "gameCard"
+                        tag.tagValue = img.attr("data-gameid")
+                    }
+                } else if (ele.childNodes()[0] is com.fleeksoft.ksoup.nodes.TextNode) {
+                    tag.tagType = "text"
+                    tag.tagValue = ele.text()
+                } /*else if (ele instanceof TextNode) {
+                    tag.setTagType("text");
+                    tag.setTagValue(ele.text());
+                } */ else if (ele.getElementsByTag("b").size != 0 && ele.childNodes().size > 1) {
+                } else if (!ele.getElementsByTag("a").isEmpty()) {
+                    tag.tagType = "link"
+                    tag.tagValue = ele.attr("href")
+                } else if (!ele.getElementsByTag("blockquote").isEmpty()) {
+                    tag.tagType = "ref"
+                    tag.tagValue = ele.text()
+                }
+                tags.add(tag)
+            }
+        }
+        return tags
+    }
+
     override suspend fun getUser(heyId: String): User {
         val user = User()
         val params = mutableMapOf(
@@ -130,55 +184,6 @@ object HeyClient : Client {
         return this.subComments
     }
 
-    override suspend fun Post.renderHTML(): List<Tag> {
-        val tags = mutableListOf<Tag>()
-        val params = mapOf(
-            "link_id" to this.postId,
-            "return_json" to "1",
-            "index" to "1"
-        )
-        val url = "${domain}/bbs/app/link/web/view?${ParamsBuilder(params).build("/bbs/app/link/web/view/")}"
-        val str = get(url)
-        val obj = Json.decodeFromString<JsonObject>(str).jsonObject.get("link")!!.jsonObject
-        val raw = obj["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content
-        val elements = Ksoup.parse(raw).getElementsByTag("body")[0].children()
-        elements.forEach {
-            var ele = it
-            val tag = Tag()
-            if (ele.childNodes().size != 0) {
-                if (!ele.getElementsByTag("h3").isEmpty() ||
-                    !ele.getElementsByTag("h2").isEmpty()
-                ) {
-                    tag.tagType = "title"
-                    tag.tagValue = ele.text()
-                } else if (!ele.getElementsByTag("img").isEmpty()) {
-                    val img = ele.getElementsByTag("img")[0]
-                    if (img.hasAttr("data-original")) {
-                        tag.tagType = "image"
-                        tag.tagValue = img.attr("data-original")
-                    } else {
-                        tag.tagType = "gameCard"
-                        tag.tagValue = img.attr("data-gameid")
-                    }
-                } else if (ele.childNodes()[0] is com.fleeksoft.ksoup.nodes.TextNode) {
-                    tag.tagType = "text"
-                    tag.tagValue = ele.text()
-                } /*else if (ele instanceof TextNode) {
-                    tag.setTagType("text");
-                    tag.setTagValue(ele.text());
-                } */ else if (ele.getElementsByTag("b").size != 0 && ele.childNodes().size > 1) {
-                } else if (!ele.getElementsByTag("a").isEmpty()) {
-                    tag.tagType = "link"
-                    tag.tagValue = ele.attr("href")
-                } else if (!ele.getElementsByTag("blockquote").isEmpty()) {
-                    tag.tagType = "ref"
-                    tag.tagValue = ele.text()
-                }
-                tags.add(tag)
-            }
-        }
-        return tags
-    }
 
     override suspend fun getPosts(topic: Topic): List<Post> {
         val id = topic.id
@@ -292,7 +297,7 @@ object HeyClient : Client {
         post.tags.addAll(post.tags.distinctBy { it })
 
         post.comments = obj.get("comment_num")!!.jsonPrimitive.int
-        post.likes = obj.get("link_award_num")!!.jsonPrimitive.int
+        post.likes = obj.get("link_award_num")!!.jsonPrimitive.int.toString()
         return post
     }
 
@@ -317,6 +322,10 @@ object HeyClient : Client {
 
     override suspend fun getImageReferer(): String {
         return "https://xiaoheihe.cn"
+    }
+
+    override fun getNameSpace(): String {
+        return "xiaoheihe"
     }
 
 
